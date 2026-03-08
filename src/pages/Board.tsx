@@ -24,9 +24,9 @@ import {
     upsertCard,
     deleteCard,
     addMessage,
-    updateMonthlyCardData,
-    Message
+    updateMonthlyCardData
 } from '../lib/firestoreService';
+import type { Message } from '../lib/firestoreService';
 
 // Mock data initially to help build the UI
 // --- Local constants replaced by Firebase ---

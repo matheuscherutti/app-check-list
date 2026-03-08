@@ -4,15 +4,13 @@ import {
     query,
     doc,
     setDoc,
-    updateDoc,
     deleteDoc,
     addDoc,
     where,
-    orderBy,
-    Timestamp
+    orderBy
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
-import { Card } from '../types';
+import type { Card } from '../types';
 
 // Types duplicated here for safety or imported from types
 export interface Message {

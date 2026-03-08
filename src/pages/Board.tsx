@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from 'react';
 import MonthTabs from '../components/layout/MonthTabs';
 import Topbar from '../components/layout/Topbar';
 import Dashboards from '../components/layout/Dashboards';
-import { getAvailableMonths } from '../utils/dateHelper';
 import { useFilterStore } from '../stores/useFilterStore';
 import { useModalStore } from '../stores/useModalStore';
 import { useUserStore } from '../stores/useUserStore';
@@ -18,23 +17,20 @@ import type { DragStartEvent, DragOverEvent, DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import type { Card, EquipmentGroup, Team } from '../types';
 import { Send, User as UserIcon, Trash2 } from 'lucide-react';
+import {
+    subscribeToCards,
+    subscribeToMessages,
+    subscribeToMonthlyData,
+    upsertCard,
+    deleteCard,
+    addMessage,
+    updateMonthlyCardData,
+    Message
+} from '../lib/firestoreService';
 
 // Mock data initially to help build the UI
+// --- Local constants replaced by Firebase ---
 const TEAMS: Team[] = ['Pré Assigment', 'Jeppesen', 'CAE'];
-
-const MOCK_CARDS: Card[] = [
-    { id: '1', title: 'Revisar manual de voo', equipment: 'A320', team: 'Pré Assigment', status: 'Pendente', order: 1, createdAt: Date.now(), isMultiTask: true, subTasks: [{ id: 's1', title: 'Verificar checklist A', status: 'Pendente' }, { id: 's2', title: 'Verificar checklist B', status: 'Pendente' }] },
-    { id: '2', title: 'Atualizar Jeppesen FD-Pro', equipment: 'A320', team: 'Jeppesen', status: 'Pendente', order: 1, createdAt: Date.now() },
-    { id: '3', title: 'Simulator briefing', equipment: 'A330', team: 'CAE', status: 'Pendente', order: 1, createdAt: Date.now() },
-];
-
-interface Message {
-    id: string;
-    text: string;
-    userName: string;
-    month: string; // Format: yyyy-MM
-    createdAt: number;
-}
 
 export default function Board() {
     const {
@@ -44,54 +40,26 @@ export default function Board() {
     const { isOpen, editingCard, openEditCard, closeModal } = useModalStore();
     const { currentUser } = useUserStore();
 
-    const [allCards, setAllCards] = useState<Card[]>(() => {
-        const saved = localStorage.getItem('checklist-app-all-cards');
-        if (saved) return JSON.parse(saved);
-
-        const months = getAvailableMonths();
-        const currentMonth = months[1]; // yyyy-MM
-        return MOCK_CARDS.map(c => ({ ...c, startMonth: currentMonth }));
-    });
-
-    const [monthlyData, setMonthlyData] = useState<Record<string, Record<string, Partial<Card>>>>(() => {
-        const saved = localStorage.getItem('checklist-app-monthly-data');
-        return saved ? JSON.parse(saved) : {};
-    });
-
-    const [messages, setMessages] = useState<Message[]>(() => {
-        const saved = localStorage.getItem('checklist-app-messages');
-        if (saved) return JSON.parse(saved);
-
-        const months = getAvailableMonths();
-        return [
-            {
-                id: 'm1',
-                text: 'Lembrar de conferir os manuais novos da CAE.',
-                userName: 'João Silva',
-                month: months[1],
-                createdAt: Date.now() - 3600000
-            }
-        ];
-    });
-
-    // Persistence
-    useEffect(() => {
-        localStorage.setItem('checklist-app-all-cards', JSON.stringify(allCards));
-    }, [allCards]);
-
-    useEffect(() => {
-        localStorage.setItem('checklist-app-monthly-data', JSON.stringify(monthlyData));
-    }, [monthlyData]);
-
-    useEffect(() => {
-        localStorage.setItem('checklist-app-messages', JSON.stringify(messages));
-    }, [messages]);
-
-    useState(() => {
-        // Remove the separate useState initialization for messages since it's now in the initial state
-    });
-
+    const [allCards, setAllCards] = useState<Card[]>([]);
+    const [monthlyData, setMonthlyData] = useState<Record<string, Record<string, Partial<Card>>>>({});
+    const [messages, setMessages] = useState<Message[]>([]);
     const [newMessage, setNewMessage] = useState('');
+
+    // --- FIREBASE SUBSCRIPTIONS ---
+    useEffect(() => {
+        const unsub = subscribeToCards(setAllCards);
+        return () => unsub();
+    }, []);
+
+    useEffect(() => {
+        const unsub = subscribeToMonthlyData(setMonthlyData);
+        return () => unsub();
+    }, []);
+
+    useEffect(() => {
+        const unsub = subscribeToMessages(selectedMonth, setMessages);
+        return () => unsub();
+    }, [selectedMonth]);
 
     const currentMonthMessages = useMemo(() => {
         return messages.filter(m => m.month === selectedMonth);
@@ -139,14 +107,14 @@ export default function Board() {
         if (current) setActiveCard(current);
     };
 
-    const onDeleteCard = (id: string) => {
+    const onDeleteCard = async (id: string) => {
         if (window.confirm('Deseja realmente excluir este card de todas as meses?')) {
-            setAllCards(prev => prev.filter(c => c.id !== id));
+            await deleteCard(id);
             closeModal();
         }
     };
 
-    const onDragOver = (event: DragOverEvent) => {
+    const onDragOver = async (event: DragOverEvent) => {
         const { active, over } = event;
         if (!over) return;
         const activeId = active.id as string;
@@ -159,33 +127,26 @@ export default function Board() {
 
         if (!isActiveCard) return;
 
-        setAllCards((prev) => {
-            const activeIndex = prev.findIndex(c => c.id === activeId);
-            const activeC = prev[activeIndex];
-            if (activeIndex === -1) return prev;
+        const activeIndex = allCards.findIndex(c => c.id === activeId);
+        const activeC = allCards[activeIndex];
+        if (activeIndex === -1) return;
 
-            if (isOverCard) {
-                const overIndex = prev.findIndex(c => c.id === overId);
-                const overC = prev[overIndex];
-                if (activeC.team !== overC.team || activeC.equipment !== overC.equipment) {
-                    const newCards = [...prev];
-                    newCards[activeIndex] = { ...activeC, team: overC.team, equipment: overC.equipment };
-                    return arrayMove(newCards, activeIndex, overIndex);
-                }
+        if (isOverCard) {
+            const overIndex = allCards.findIndex(c => c.id === overId);
+            const overC = allCards[overIndex];
+            if (activeC.team !== overC.team || activeC.equipment !== overC.equipment) {
+                await upsertCard({ ...activeC, team: overC.team, equipment: overC.equipment });
             }
-            if (isOverColumn) {
-                const [, equip, tm] = overId.split('-'); // format col-A320-Team
-                if (activeC.team !== tm || activeC.equipment !== equip) {
-                    const newCards = [...prev];
-                    newCards[activeIndex] = { ...activeC, team: tm as Team, equipment: equip as EquipmentGroup };
-                    return arrayMove(newCards, activeIndex, prev.length - 1);
-                }
+        }
+        if (isOverColumn) {
+            const [, equip, tm] = overId.split('-'); // format col-A320-Team
+            if (activeC.team !== tm || activeC.equipment !== equip) {
+                await upsertCard({ ...activeC, team: tm as Team, equipment: equip as EquipmentGroup });
             }
-            return prev;
-        });
+        }
     };
 
-    const onDragEnd = (event: DragEndEvent) => {
+    const onDragEnd = async (event: DragEndEvent) => {
         setActiveCard(null);
         const { active, over } = event;
         if (!over) return;
@@ -193,29 +154,26 @@ export default function Board() {
         const overId = over.id as string;
         if (activeId === overId) return;
 
-        setAllCards(prev => {
-            const activeIndex = prev.findIndex(c => c.id === activeId);
-            const overIndex = prev.findIndex(c => c.id === overId);
-            const newCards = arrayMove(prev, activeIndex, overIndex);
-            return newCards.map((c, i) => ({ ...c, order: i }));
+        const activeIndex = allCards.findIndex(c => c.id === activeId);
+        const overIndex = allCards.findIndex(c => c.id === overId);
+        const newCards = arrayMove(allCards, activeIndex, overIndex);
+
+        // Push all updated orders to Firestore
+        await Promise.all(
+            newCards.map((c, i) => upsertCard({ ...c, order: i }))
+        );
+    };
+
+    const handleToggleStatus = async (cardId: string, currentStatus: string) => {
+        const newStatus = currentStatus === 'Concluído' ? 'Pendente' : 'Concluído';
+        const currentData = monthlyData[selectedMonth]?.[cardId] || {};
+        await updateMonthlyCardData(selectedMonth, cardId, {
+            ...currentData,
+            status: newStatus as 'Pendente' | 'Concluído'
         });
     };
 
-    const handleToggleStatus = (cardId: string, currentStatus: string) => {
-        const newStatus = currentStatus === 'Concluído' ? 'Pendente' : 'Concluído';
-        setMonthlyData(prev => ({
-            ...prev,
-            [selectedMonth]: {
-                ...(prev[selectedMonth] || {}),
-                [cardId]: {
-                    ...(prev[selectedMonth]?.[cardId] || {}),
-                    status: newStatus as 'Pendente' | 'Concluído'
-                }
-            }
-        }));
-    };
-
-    const handleToggleSubTask = (cardId: string, subTaskId: string, currentStatus: string) => {
+    const handleToggleSubTask = async (cardId: string, subTaskId: string, currentStatus: string) => {
         const newStatus = currentStatus === 'Concluído' ? 'Pendente' : 'Concluído';
         const cardDefinition = currentMonthCards.find(c => c.id === cardId);
         if (!cardDefinition) return;
@@ -226,35 +184,29 @@ export default function Board() {
         );
         const allCompleted = updatedSubTasks.length > 0 && updatedSubTasks.every(st => st.status === 'Concluído');
 
-        setMonthlyData(prev => ({
-            ...prev,
-            [selectedMonth]: {
-                ...(prev[selectedMonth] || {}),
-                [cardId]: {
-                    ...(prev[selectedMonth]?.[cardId] || {}),
-                    status: (allCompleted ? 'Concluído' : 'Pendente') as 'Pendente' | 'Concluído',
-                    subTasks: updatedSubTasks
-                }
-            }
-        }));
+        const currentData = monthlyData[selectedMonth]?.[cardId] || {};
+        await updateMonthlyCardData(selectedMonth, cardId, {
+            ...currentData,
+            status: (allCompleted ? 'Concluído' : 'Pendente') as 'Pendente' | 'Concluído',
+            subTasks: updatedSubTasks
+        });
     };
 
-    const handleSendMessage = () => {
+    const handleSendMessage = async () => {
         if (!newMessage.trim()) return;
-        const msg: Message = {
-            id: Date.now().toString(),
+        await addMessage({
             text: newMessage,
             userName: currentUser?.name || 'Anônimo',
             month: selectedMonth,
             createdAt: Date.now()
-        };
-        setMessages(prev => [msg, ...prev]);
+        });
         setNewMessage('');
     };
 
-    const handleDeleteMessage = (id: string) => {
+    const handleDeleteMessage = async (id: string) => {
         if (window.confirm('Deseja realmente remover este recado?')) {
-            setMessages(prev => prev.filter(m => m.id !== id));
+            const { deleteMessage } = await import('../lib/firestoreService');
+            await deleteMessage(id);
         }
     };
 
@@ -432,17 +384,17 @@ export default function Board() {
                 onClose={closeModal}
                 card={editingCard}
                 onDelete={onDeleteCard}
-                onSave={(data) => {
+                onSave={async (data) => {
                     const cardId = editingCard ? editingCard.id : Math.random().toString(36).substr(2, 9);
                     if (editingCard) {
-                        setAllCards(prev => prev.map(c => c.id === cardId ? { ...c, ...data } : c));
-                        setMonthlyData(prev => ({
-                            ...prev,
-                            [selectedMonth]: {
-                                ...(prev[selectedMonth] || {}),
-                                [cardId]: { ...prev[selectedMonth]?.[cardId], notes: data.notes }
-                            }
-                        }));
+                        await upsertCard({ ...editingCard, ...data });
+                        if (data.notes !== undefined) {
+                            const currentData = monthlyData[selectedMonth]?.[cardId] || {};
+                            await updateMonthlyCardData(selectedMonth, cardId, {
+                                ...currentData,
+                                notes: data.notes
+                            });
+                        }
                     } else {
                         const newCard: Card = {
                             id: cardId,
@@ -450,13 +402,13 @@ export default function Board() {
                             equipment: data.equipment || 'A320',
                             team: data.team || 'Pré Assigment',
                             status: 'Pendente',
-                            order: allCards.length + 1,
-                            isMultiTask: data.isMultiTask,
-                            subTasks: data.subTasks,
+                            order: allCards.length,
+                            isMultiTask: data.isMultiTask || false,
+                            subTasks: data.subTasks || [],
                             startMonth: selectedMonth,
                             createdAt: Date.now()
                         };
-                        setAllCards(prev => [...prev, newCard]);
+                        await upsertCard(newCard);
                     }
                     closeModal();
                 }}

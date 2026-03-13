@@ -2,18 +2,20 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUserStore } from '../stores/useUserStore';
 import type { User } from '../stores/useUserStore';
-
-// Mock values for now, this would normally come from Firebase `users` collection.
-const MOCK_USERS: User[] = [
-    { id: '1', name: 'João Silva', role: 'admin', isActive: true },
-    { id: '2', name: 'Maria Souza', role: 'operator', isActive: true },
-    { id: '3', name: 'Carlos Almeida', role: 'operator', isActive: true },
-];
+import { subscribeToUsers } from '../lib/firestoreService';
 
 export default function Login() {
     const navigate = useNavigate();
     const { currentUser, setCurrentUser } = useUserStore();
-    const [users] = useState<User[]>(MOCK_USERS); // Later, replace with Firestore listener!
+    const [users, setUsers] = useState<User[]>([]);
+
+    useEffect(() => {
+        const unsub = subscribeToUsers((allUsers) => {
+            // Only show active users on login screen
+            setUsers(allUsers.filter(u => u.isActive));
+        });
+        return () => unsub();
+    }, []);
 
     useEffect(() => {
         // Se o usuário já estiver logado (localStorage tem valor), joga direto pro board.

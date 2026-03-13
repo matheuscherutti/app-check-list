@@ -1,52 +1,32 @@
 import { useState, useEffect } from 'react';
 import { UserPlus, UserCheck, Search, Trash2, Edit2, Shield, User as UserIcon } from 'lucide-react';
-
-interface Member {
-    id: string;
-    name: string;
-    role: 'Administrador' | 'Operador';
-    status: 'Ativo' | 'Inativo';
-}
-
-const MOCK_MEMBERS: Member[] = [
-    { id: '1', name: 'João Silva', role: 'Administrador', status: 'Ativo' },
-    { id: '2', name: 'Maria Souza', role: 'Operador', status: 'Ativo' },
-    { id: '3', name: 'Carlos Almeida', role: 'Operador', status: 'Ativo' },
-];
+import { subscribeToUsers, upsertUser, deleteUser } from '../lib/firestoreService';
+import type { User } from '../stores/useUserStore';
 
 export default function Settings() {
-    const [members, setMembers] = useState<Member[]>(() => {
-        const saved = localStorage.getItem('checklist-app-members');
-        return saved ? JSON.parse(saved) : MOCK_MEMBERS;
-    });
+    const [members, setMembers] = useState<User[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isAdding, setIsAdding] = useState(false);
-    const [editingMember, setEditingMember] = useState<Member | null>(null);
+    const [editingMember, setEditingMember] = useState<User | null>(null);
     const [newName, setNewName] = useState('');
-    const [newRole, setNewRole] = useState<'Administrador' | 'Operador'>('Operador');
+    const [newRole, setNewRole] = useState<'admin' | 'operator'>('operator');
 
-    // Persistence
     useEffect(() => {
-        localStorage.setItem('checklist-app-members', JSON.stringify(members));
-    }, [members]);
+        const unsub = subscribeToUsers(setMembers);
+        return () => unsub();
+    }, []);
 
-    const handleSaveMember = () => {
+    const handleSaveMember = async () => {
         if (!newName.trim()) return;
 
-        if (editingMember) {
-            setMembers(prev => prev.map(m =>
-                m.id === editingMember.id ? { ...m, name: newName, role: newRole } : m
-            ));
-        } else {
-            const newMember: Member = {
-                id: Date.now().toString(),
-                name: newName,
-                role: newRole,
-                status: 'Ativo'
-            };
-            setMembers(prev => [...prev, newMember]);
-        }
+        const memberData: User = {
+            id: editingMember ? editingMember.id : Date.now().toString(),
+            name: newName,
+            role: newRole,
+            isActive: editingMember ? editingMember.isActive : true
+        };
 
+        await upsertUser(memberData);
         closeModal();
     };
 
@@ -54,26 +34,24 @@ export default function Settings() {
         setIsAdding(false);
         setEditingMember(null);
         setNewName('');
-        setNewRole('Operador');
+        setNewRole('operator');
     };
 
-    const openEditModal = (member: Member) => {
+    const openEditModal = (member: User) => {
         setEditingMember(member);
         setNewName(member.name);
         setNewRole(member.role);
         setIsAdding(true);
     };
 
-    const handleDeleteMember = (id: string) => {
+    const handleDeleteMember = async (id: string) => {
         if (window.confirm('Tem certeza que deseja remover este membro da equipe?')) {
-            setMembers(prev => prev.filter(m => m.id !== id));
+            await deleteUser(id);
         }
     };
 
-    const handleToggleStatus = (id: string) => {
-        setMembers(prev => prev.map(m =>
-            m.id === id ? { ...m, status: m.status === 'Ativo' ? 'Inativo' : 'Ativo' } : m
-        ));
+    const handleToggleStatus = async (member: User) => {
+        await upsertUser({ ...member, isActive: !member.isActive });
     };
 
     const filteredMembers = members.filter(m =>
@@ -137,11 +115,11 @@ export default function Settings() {
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Função</label>
                                 <select
                                     value={newRole}
-                                    onChange={(e) => setNewRole(e.target.value as 'Administrador' | 'Operador')}
+                                    onChange={(e) => setNewRole(e.target.value as 'admin' | 'operator')}
                                     className="w-full border-slate-200 rounded-lg focus:ring-primary-500 focus:border-primary-500"
                                 >
-                                    <option value="Operador">Operador (Apenas Checklist)</option>
-                                    <option value="Administrador">Administrador (Total)</option>
+                                    <option value="operator">Operador (Apenas Checklist)</option>
+                                    <option value="admin">Administrador (Total)</option>
                                 </select>
                             </div>
                             <div className="flex gap-3 pt-4">
@@ -187,33 +165,33 @@ export default function Settings() {
                                     <tr key={member.id} className="hover:bg-slate-50/50 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-sm ${member.status === 'Inativo' ? 'bg-slate-300' : 'bg-primary-500'}`}>
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-sm ${!member.isActive ? 'bg-slate-300' : 'bg-primary-500'}`}>
                                                     {member.name.charAt(0).toUpperCase()}
                                                 </div>
-                                                <span className={`font-bold text-sm ${member.status === 'Inativo' ? 'text-slate-400' : 'text-slate-900'}`}>{member.name}</span>
+                                                <span className={`font-bold text-sm ${!member.isActive ? 'text-slate-400' : 'text-slate-900'}`}>{member.name}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-1.5">
-                                                {member.role === 'Administrador' ? (
+                                                {member.role === 'admin' ? (
                                                     <Shield size={14} className="text-amber-500" />
                                                 ) : (
                                                     <UserIcon size={14} className="text-slate-400" />
                                                 )}
-                                                <span className={`text-xs font-semibold ${member.role === 'Administrador' ? 'text-amber-700' : 'text-slate-600'}`}>
-                                                    {member.role}
+                                                <span className={`text-xs font-semibold ${member.role === 'admin' ? 'text-amber-700' : 'text-slate-600'}`}>
+                                                    {member.role === 'admin' ? 'Administrador' : 'Operador'}
                                                 </span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <button
-                                                onClick={() => handleToggleStatus(member.id)}
-                                                className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all ${member.status === 'Ativo'
+                                                onClick={() => handleToggleStatus(member)}
+                                                className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all ${member.isActive
                                                     ? 'bg-green-100 text-green-700 border border-green-200'
                                                     : 'bg-slate-100 text-slate-500 border border-slate-200'
                                                     }`}
                                             >
-                                                {member.status}
+                                                {member.isActive ? 'Ativo' : 'Inativo'}
                                             </button>
                                         </td>
                                         <td className="px-6 py-4 text-right">

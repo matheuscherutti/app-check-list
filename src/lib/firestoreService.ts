@@ -24,6 +24,7 @@ export interface Message {
 const CARDS_COLLECTION = 'cards';
 const MESSAGES_COLLECTION = 'messages';
 const MONTHLY_DATA_COLLECTION = 'monthlyData';
+const USERS_COLLECTION = 'users';
 
 // --- CARDS ---
 
@@ -85,4 +86,23 @@ export const subscribeToMonthlyData = (callback: (data: any) => void) => {
 export const updateMonthlyCardData = async (month: string, cardId: string, updates: any) => {
     const docRef = doc(db, MONTHLY_DATA_COLLECTION, month);
     await setDoc(docRef, { [cardId]: updates }, { merge: true });
+};
+
+// --- USERS (Equipe) ---
+
+export const subscribeToUsers = (callback: (users: any[]) => void) => {
+    const q = query(collection(db, USERS_COLLECTION), orderBy('name', 'asc'));
+    return onSnapshot(q, (snapshot) => {
+        const users = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        callback(users);
+    });
+};
+
+export const upsertUser = async (user: any) => {
+    const userDoc = doc(db, USERS_COLLECTION, user.id);
+    await setDoc(userDoc, { ...user, updatedAt: Date.now() }, { merge: true });
+};
+
+export const deleteUser = async (userId: string) => {
+    await deleteDoc(doc(db, USERS_COLLECTION, userId));
 };

@@ -31,11 +31,16 @@ export default function Login() {
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-            <div className="sm:mx-auto sm:w-full sm:max-w-md">
-                <h2 className="mt-6 text-center text-3xl font-extrabold text-slate-900">
+            <div className="sm:mx-auto sm:w-full sm:max-w-md flex flex-col items-center">
+                <img
+                    src="/logo.jpg"
+                    alt="Logo Planejamento de Aeronautas"
+                    className="w-48 h-auto mb-6 rounded-2xl shadow-xl border border-white/50"
+                />
+                <h2 className="text-center text-3xl font-extrabold text-slate-900 tracking-tight">
                     Check List Aeronautas
                 </h2>
-                <p className="mt-2 text-center text-sm text-slate-600">
+                <p className="mt-2 text-center text-sm text-slate-600 font-medium bg-slate-100 px-4 py-1 rounded-full border border-slate-200">
                     Selecione seu nome para entrar. Não é necessária senha.
                 </p>
             </div>

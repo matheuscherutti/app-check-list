@@ -50,11 +50,12 @@ export const deleteCard = async (cardId: string) => {
 export const subscribeToMessages = (month: string, callback: (messages: Message[]) => void) => {
     const q = query(
         collection(db, MESSAGES_COLLECTION),
-        where('month', '==', month),
-        orderBy('createdAt', 'asc')
+        where('month', '==', month)
     );
     return onSnapshot(q, (snapshot) => {
-        const messages = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Message));
+        const messages = snapshot.docs
+            .map(doc => ({ ...doc.data(), id: doc.id } as Message))
+            .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
         callback(messages);
     });
 };

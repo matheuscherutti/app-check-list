@@ -12,7 +12,6 @@ import {
 import { db } from './firebaseConfig';
 import type { Card } from '../types';
 
-// Types duplicated here for safety or imported from types
 export interface Message {
     id: string;
     text: string;
@@ -21,10 +20,20 @@ export interface Message {
     createdAt: number;
 }
 
+export interface AuditEntry {
+    id: string;
+    user: string;
+    action: 'Criou' | 'Editou' | 'Deletou' | 'Moveu' | 'Concluiu';
+    target: string;
+    details: string;
+    timestamp: number;
+}
+
 const CARDS_COLLECTION = 'cards';
 const MESSAGES_COLLECTION = 'messages';
 const MONTHLY_DATA_COLLECTION = 'monthlyData';
 const USERS_COLLECTION = 'users';
+const LOGS_COLLECTION = 'logs';
 
 // --- CARDS ---
 
@@ -106,4 +115,23 @@ export const upsertUser = async (user: any) => {
 
 export const deleteUser = async (userId: string) => {
     await deleteDoc(doc(db, USERS_COLLECTION, userId));
+};
+
+// --- AUDIT LOGS ---
+
+export const auditLog = async (entry: Omit<AuditEntry, 'id'>) => {
+    await addDoc(collection(db, LOGS_COLLECTION), {
+        ...entry,
+        timestamp: Date.now()
+    });
+};
+
+export const subscribeToLogs = (callback: (logs: AuditEntry[]) => void) => {
+    const q = query(collection(db, LOGS_COLLECTION));
+    return onSnapshot(q, (snapshot) => {
+        const logs = snapshot.docs
+            .map(doc => ({ ...doc.data(), id: doc.id } as AuditEntry))
+            .sort((a, b) => b.timestamp - a.timestamp);
+        callback(logs);
+    });
 };

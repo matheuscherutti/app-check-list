@@ -24,7 +24,8 @@ import {
     upsertCard,
     deleteCard,
     addMessage,
-    updateMonthlyCardData
+    updateMonthlyCardData,
+    auditLog
 } from '../lib/firestoreService';
 import type { Message } from '../lib/firestoreService';
 
@@ -108,8 +109,16 @@ export default function Board() {
     };
 
     const onDeleteCard = async (id: string) => {
+        const card = allCards.find(c => c.id === id);
         if (window.confirm('Deseja realmente excluir este card de todas as meses?')) {
             await deleteCard(id);
+            await auditLog({
+                user: currentUser?.name || 'Sistema',
+                action: 'Deletou',
+                target: card?.title || 'Card desconhecido',
+                details: `Removido do sistema permanentemente`,
+                timestamp: Date.now()
+            });
             closeModal();
         }
     };
@@ -136,12 +145,26 @@ export default function Board() {
             const overC = allCards[overIndex];
             if (activeC.team !== overC.team || activeC.equipment !== overC.equipment) {
                 await upsertCard({ ...activeC, team: overC.team, equipment: overC.equipment });
+                await auditLog({
+                    user: currentUser?.name || 'Sistema',
+                    action: 'Moveu',
+                    target: activeC.title,
+                    details: `Movido para ${overC.team} (${overC.equipment})`,
+                    timestamp: Date.now()
+                });
             }
         }
         if (isOverColumn) {
             const [, equip, tm] = overId.split('-'); // format col-A320-Team
             if (activeC.team !== tm || activeC.equipment !== equip) {
                 await upsertCard({ ...activeC, team: tm as Team, equipment: equip as EquipmentGroup });
+                await auditLog({
+                    user: currentUser?.name || 'Sistema',
+                    action: 'Moveu',
+                    target: activeC.title,
+                    details: `Movido para ${tm} (${equip})`,
+                    timestamp: Date.now()
+                });
             }
         }
     };
@@ -185,11 +208,23 @@ export default function Board() {
         const allCompleted = updatedSubTasks.length > 0 && updatedSubTasks.every(st => st.status === 'Concluído');
 
         const currentData = monthlyData[selectedMonth]?.[cardId] || {};
+        const finalStatus = allCompleted ? 'Concluído' : 'Pendente';
+
         await updateMonthlyCardData(selectedMonth, cardId, {
             ...currentData,
-            status: (allCompleted ? 'Concluído' : 'Pendente') as 'Pendente' | 'Concluído',
+            status: finalStatus as 'Pendente' | 'Concluído',
             subTasks: updatedSubTasks
         });
+
+        if (allCompleted && currentData.status !== 'Concluído') {
+            await auditLog({
+                user: currentUser?.name || 'Sistema',
+                action: 'Concluiu',
+                target: cardDefinition.title,
+                details: `Todas as subtarefas concluídas em ${selectedMonth}`,
+                timestamp: Date.now()
+            });
+        }
     };
 
     const handleSendMessage = async () => {
@@ -395,6 +430,13 @@ export default function Board() {
                                 notes: data.notes
                             });
                         }
+                        await auditLog({
+                            user: currentUser?.name || 'Sistema',
+                            action: 'Editou',
+                            target: data.title || editingCard.title,
+                            details: `Alterações salvas no card`,
+                            timestamp: Date.now()
+                        });
                     } else {
                         const newCard: Card = {
                             id: cardId,
@@ -409,6 +451,13 @@ export default function Board() {
                             createdAt: Date.now()
                         };
                         await upsertCard(newCard);
+                        await auditLog({
+                            user: currentUser?.name || 'Sistema',
+                            action: 'Criou',
+                            target: data.title || 'Novo Card',
+                            details: `Criado em ${newCard.team} (${newCard.equipment})`,
+                            timestamp: Date.now()
+                        });
                     }
                     closeModal();
                 }}

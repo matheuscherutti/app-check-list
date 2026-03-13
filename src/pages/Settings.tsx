@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { UserPlus, UserCheck, Search, Trash2, Edit2, Shield, User as UserIcon } from 'lucide-react';
-import { subscribeToUsers, upsertUser, deleteUser } from '../lib/firestoreService';
+import { subscribeToUsers, upsertUser, deleteUser, auditLog } from '../lib/firestoreService';
 import type { User } from '../stores/useUserStore';
+import { useUserStore } from '../stores/useUserStore';
 
 export default function Settings() {
     const [members, setMembers] = useState<User[]>([]);
@@ -10,6 +11,7 @@ export default function Settings() {
     const [editingMember, setEditingMember] = useState<User | null>(null);
     const [newName, setNewName] = useState('');
     const [newRole, setNewRole] = useState<'admin' | 'operator'>('operator');
+    const { currentUser } = useUserStore();
 
     useEffect(() => {
         const unsub = subscribeToUsers(setMembers);
@@ -27,6 +29,13 @@ export default function Settings() {
         };
 
         await upsertUser(memberData);
+        await auditLog({
+            user: currentUser?.name || 'Sistema',
+            action: editingMember ? 'Editou' : 'Criou',
+            target: `Membro: ${memberData.name}`,
+            details: `${editingMember ? 'Atualizou' : 'Adicionou'} ${memberData.name} como ${memberData.role}`,
+            timestamp: Date.now()
+        });
         closeModal();
     };
 
@@ -45,13 +54,29 @@ export default function Settings() {
     };
 
     const handleDeleteMember = async (id: string) => {
+        const member = members.find(m => m.id === id);
         if (window.confirm('Tem certeza que deseja remover este membro da equipe?')) {
             await deleteUser(id);
+            await auditLog({
+                user: currentUser?.name || 'Sistema',
+                action: 'Deletou',
+                target: `Membro: ${member?.name || id}`,
+                details: `Membro removido da equipe`,
+                timestamp: Date.now()
+            });
         }
     };
 
     const handleToggleStatus = async (member: User) => {
-        await upsertUser({ ...member, isActive: !member.isActive });
+        const newStatus = !member.isActive;
+        await upsertUser({ ...member, isActive: newStatus });
+        await auditLog({
+            user: currentUser?.name || 'Sistema',
+            action: 'Editou',
+            target: `Membro: ${member.name}`,
+            details: `Status alterado para ${newStatus ? 'Ativo' : 'Inativo'}`,
+            timestamp: Date.now()
+        });
     };
 
     const filteredMembers = members.filter(m =>

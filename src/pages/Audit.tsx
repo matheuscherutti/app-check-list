@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     Clock,
     CheckCircle2,
@@ -11,50 +11,8 @@ import {
     Search,
     Filter
 } from 'lucide-react';
-
-interface AuditEntry {
-    id: string;
-    user: string;
-    action: 'Criou' | 'Editou' | 'Deletou' | 'Moveu' | 'Concluiu';
-    target: string;
-    details: string;
-    timestamp: number;
-}
-
-const MOCK_LOGS: AuditEntry[] = [
-    {
-        id: '1',
-        user: 'João Silva',
-        action: 'Concluiu',
-        target: 'Revisar manual de voo',
-        details: 'Status alterado de Pendente para Concluído (A320)',
-        timestamp: Date.now() - 1000 * 60 * 15 // 15 min ago
-    },
-    {
-        id: '2',
-        user: 'Maria Santos',
-        action: 'Criou',
-        target: 'Novo card: Limpeza de Equipamento',
-        details: 'Equipamento ERJ em Pré Assigment',
-        timestamp: Date.now() - 1000 * 60 * 60 * 2 // 2 hours ago
-    },
-    {
-        id: '3',
-        user: 'João Silva',
-        action: 'Moveu',
-        target: 'Checklist de Manutenção',
-        details: 'Movido de Jeppesen para CAE (ATR)',
-        timestamp: Date.now() - 1000 * 60 * 60 * 5 // 5 hours ago
-    },
-    {
-        id: '4',
-        user: 'Ricardo Pereira',
-        action: 'Editou',
-        target: 'Observações do Card #12',
-        details: 'Adicionada nota: "Validar com o mecânico na volta"',
-        timestamp: Date.now() - 1000 * 60 * 60 * 24 // 1 day ago
-    },
-];
+import { subscribeToLogs } from '../lib/firestoreService';
+import type { AuditEntry } from '../lib/firestoreService';
 
 const getActionIcon = (action: AuditEntry['action']) => {
     switch (action) {
@@ -80,8 +38,14 @@ const getActionBadgeStyle = (action: AuditEntry['action']) => {
 
 export default function Audit() {
     const [searchTerm, setSearchTerm] = useState('');
+    const [logs, setLogs] = useState<AuditEntry[]>([]);
 
-    const filteredLogs = MOCK_LOGS.filter(log =>
+    useEffect(() => {
+        const unsub = subscribeToLogs(setLogs);
+        return () => unsub();
+    }, []);
+
+    const filteredLogs = logs.filter(log =>
         log.target.toLowerCase().includes(searchTerm.toLowerCase()) ||
         log.user.toLowerCase().includes(searchTerm.toLowerCase())
     );

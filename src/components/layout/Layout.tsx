@@ -2,11 +2,10 @@ import { Outlet, Link } from 'react-router-dom';
 import { useUserStore } from '../../stores/useUserStore';
 import { LogOut, Settings, LayoutDashboard, ScrollText } from 'lucide-react';
 import { useFilterStore } from '../../stores/useFilterStore';
-import { formatMonthLabel } from '../../utils/dateHelper';
-
+import MonthTabs from './MonthTabs';
 export default function Layout() {
     const { currentUser, logout } = useUserStore();
-    const { selectedMonth } = useFilterStore();
+    const { selectedMonth, setSelectedMonth } = useFilterStore();
 
     return (
         <div className="flex flex-col min-h-screen">
@@ -33,14 +32,8 @@ export default function Layout() {
                     </nav>
                 </div>
 
-                <div className="hidden lg:flex flex-1 justify-center items-center">
-                    <span className="text-slate-700 font-bold bg-slate-100 px-4 py-1.5 rounded-full border border-slate-200 uppercase tracking-widest text-sm shadow-sm relative">
-                        <span className="text-primary-600 mr-1">Escala de</span> {formatMonthLabel(selectedMonth)}
-                        <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-3 w-3 bg-primary-500"></span>
-                        </span>
-                    </span>
+                <div className="hidden xl:flex flex-[1.5] justify-start items-center xl:-ml-8 2xl:-ml-20">
+                    <MonthTabs selectedMonth={selectedMonth} onSelectMonth={setSelectedMonth} />
                 </div>
 
                 <div className="flex items-center gap-4">

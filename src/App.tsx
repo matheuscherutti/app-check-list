@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useUserStore } from './stores/useUserStore';
 import Login from './pages/Login';
-import Board from './pages/Board';
+import Board from './pages/BoardMockup';
 import Settings from './pages/Settings';
 import Audit from './pages/Audit';
 import Layout from './components/layout/Layout';

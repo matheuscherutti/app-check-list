@@ -31,7 +31,7 @@ const TEAMS: Team[] = ['Pré Assigment', 'Jeppesen', 'CAE'];
 
 export default function Board() {
     const {
-        searchQuery, statusFilter, teamFilter, equipmentFilter,
+        searchQuery, setSearchQuery, statusFilter, teamFilter, equipmentFilter,
         selectedMonth, setEquipmentFilter
     } = useFilterStore();
     const { isOpen, editingCard, openEditCard, openNewCard, closeModal } = useModalStore();
@@ -333,8 +333,8 @@ export default function Board() {
                                 <input
                                     type="text"
                                     placeholder="Buscar..."
-                                    value={useFilterStore.getState().searchQuery}
-                                    onChange={(e) => useFilterStore.getState().setSearchQuery(e.target.value)}
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
                                     className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-full text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium placeholder-slate-300 shadow-sm"
                                 />
                             </div>
@@ -453,7 +453,7 @@ export default function Board() {
 
                     {/* Painel Lateral (Mural) */}
                     {showSidebar && (
-                        <aside className="w-[320px] lg:w-[350px] shrink-0 bg-white border border-slate-200/70 rounded-[2rem] sticky top-0 shadow-sm flex flex-col overflow-hidden h-[fit-content] max-h-[85vh]">
+                        <aside className="w-[320px] lg:w-[350px] shrink-0 bg-white border border-slate-200/70 rounded-[2rem] sticky top-0 shadow-sm flex flex-col overflow-hidden h-fit max-h-[calc(100vh-140px)]">
                             <div className="px-6 py-5 border-b border-slate-100/50 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <MessageSquare size={16} className="text-blue-500 transform -scale-x-100" strokeWidth={2.5} />

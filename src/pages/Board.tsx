@@ -200,6 +200,37 @@ export default function Board() {
         });
     };
 
+    const handleToggleSubTask = async (cardId: string, subTaskId: string, currentStatus: string) => {
+        const newStatus = currentStatus === 'Concluído' ? 'Pendente' : 'Concluído';
+        const cardDefinition = currentMonthCards.find(c => c.id === cardId);
+        if (!cardDefinition) return;
+
+        const currentSubTasks = cardDefinition.subTasks || [];
+        const updatedSubTasks = currentSubTasks.map(st =>
+            st.id === subTaskId ? { ...st, status: newStatus as 'Pendente' | 'Concluído' } : st
+        );
+        const allCompleted = updatedSubTasks.length > 0 && updatedSubTasks.every(st => st.status === 'Concluído');
+
+        const currentData = monthlyData[selectedMonth]?.[cardId] || {};
+        const finalStatus = allCompleted ? 'Concluído' : 'Pendente';
+
+        await updateMonthlyCardData(selectedMonth, cardId, {
+            ...currentData,
+            status: finalStatus as 'Pendente' | 'Concluído',
+            subTasks: updatedSubTasks
+        });
+
+        if (allCompleted && currentData.status !== 'Concluído') {
+            await auditLog({
+                user: currentUser?.name || 'Sistema',
+                action: 'Concluiu',
+                target: cardDefinition.title,
+                details: `Todas as subtarefas concluídas em ${selectedMonth}`,
+                timestamp: Date.now()
+            });
+        }
+    };
+
     const handleSendMessage = async () => {
         if (!newMessage.trim()) return;
         await addMessage({
@@ -382,6 +413,7 @@ export default function Board() {
                                                                                 card={card}
                                                                                 openEditCard={openEditCard}
                                                                                 onToggleStatus={handleToggleStatus}
+                                                                                onToggleSubTask={handleToggleSubTask}
                                                                             />
                                                                         ))}
                                                                     </div>
@@ -396,6 +428,7 @@ export default function Board() {
                                                                     card={card}
                                                                     openEditCard={openEditCard}
                                                                     onToggleStatus={handleToggleStatus}
+                                                                    onToggleSubTask={handleToggleSubTask}
                                                                 />
                                                             ))}
                                                         </div>
@@ -413,7 +446,7 @@ export default function Board() {
                                 );
                             })}
                             <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.4' } } }) }}>
-                                {activeCard && <KanbanColumn id="overlay" team={activeCard.team} cards={[activeCard]}><SortableCardItem card={activeCard} openEditCard={openEditCard} onToggleStatus={handleToggleStatus} /></KanbanColumn>}
+                                {activeCard && <KanbanColumn id="overlay" team={activeCard.team} cards={[activeCard]}><SortableCardItem card={activeCard} openEditCard={openEditCard} onToggleStatus={handleToggleStatus} onToggleSubTask={handleToggleSubTask} /></KanbanColumn>}
                             </DragOverlay>
                         </DndContext>
                     </div>

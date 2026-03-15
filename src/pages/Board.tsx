@@ -159,14 +159,14 @@ export default function Board() {
             }
         }
         if (isOverColumn) {
-            const [, equip, tm] = overId.split('-'); // format col-A320-Team
-            if (activeC.team !== tm || activeC.equipment !== equip) {
-                await upsertCard({ ...activeC, team: tm as Team, equipment: equip as EquipmentGroup });
+            const tm = overId.replace('col-team-', ''); // ex: col-team-CAE -> CAE
+            if (activeC.team !== tm) {
+                await upsertCard({ ...activeC, team: tm as Team });
                 await auditLog({
                     user: currentUser?.name || 'Sistema',
                     action: 'Moveu',
                     target: activeC.title,
-                    details: `Movido para ${tm} (${equip})`,
+                    details: `Movido para aba da equipe ${tm}`,
                     timestamp: Date.now()
                 });
             }
@@ -200,37 +200,6 @@ export default function Board() {
         });
     };
 
-    const handleToggleSubTask = async (cardId: string, subTaskId: string, currentStatus: string) => {
-        const newStatus = currentStatus === 'Concluído' ? 'Pendente' : 'Concluído';
-        const cardDefinition = currentMonthCards.find(c => c.id === cardId);
-        if (!cardDefinition) return;
-
-        const currentSubTasks = cardDefinition.subTasks || [];
-        const updatedSubTasks = currentSubTasks.map(st =>
-            st.id === subTaskId ? { ...st, status: newStatus as 'Pendente' | 'Concluído' } : st
-        );
-        const allCompleted = updatedSubTasks.length > 0 && updatedSubTasks.every(st => st.status === 'Concluído');
-
-        const currentData = monthlyData[selectedMonth]?.[cardId] || {};
-        const finalStatus = allCompleted ? 'Concluído' : 'Pendente';
-
-        await updateMonthlyCardData(selectedMonth, cardId, {
-            ...currentData,
-            status: finalStatus as 'Pendente' | 'Concluído',
-            subTasks: updatedSubTasks
-        });
-
-        if (allCompleted && currentData.status !== 'Concluído') {
-            await auditLog({
-                user: currentUser?.name || 'Sistema',
-                action: 'Concluiu',
-                target: cardDefinition.title,
-                details: `Todas as subtarefas concluídas em ${selectedMonth}`,
-                timestamp: Date.now()
-            });
-        }
-    };
-
     const handleSendMessage = async () => {
         if (!newMessage.trim()) return;
         await addMessage({
@@ -251,14 +220,14 @@ export default function Board() {
 
     // --- Progress Calculations for the Header ---
     const allEqGroups: EquipmentGroup[] = ['A320', 'A330', 'ATR', 'ERJ', 'Cmros'];
-    const totalCurrentMonthCards = currentMonthCards.length;
-    const completedCurrentMonthCards = currentMonthCards.filter(c => c.status === 'Concluído').length;
+    const totalCurrentMonthCards = filteredCards.length;
+    const completedCurrentMonthCards = filteredCards.filter(c => c.status === 'Concluído').length;
     const globalPercentRaw = totalCurrentMonthCards === 0 ? 0 : (completedCurrentMonthCards / totalCurrentMonthCards);
     const globalProgress = Math.round(globalPercentRaw * 100);
     const globalDashOffset = 175.9 - (175.9 * globalPercentRaw);
 
     const eqProgressData = allEqGroups.map(eq => {
-        const eqCards = currentMonthCards.filter(c => c.equipment === eq);
+        const eqCards = filteredCards.filter(c => c.equipment === eq);
         const eqTotal = eqCards.length;
         const eqCompleted = eqCards.filter(c => c.status === 'Concluído').length;
         const eqPercent = eqTotal === 0 ? 0 : Math.round((eqCompleted / eqTotal) * 100);
@@ -413,7 +382,6 @@ export default function Board() {
                                                                                 card={card}
                                                                                 openEditCard={openEditCard}
                                                                                 onToggleStatus={handleToggleStatus}
-                                                                                onToggleSubTask={handleToggleSubTask}
                                                                             />
                                                                         ))}
                                                                     </div>
@@ -428,7 +396,6 @@ export default function Board() {
                                                                     card={card}
                                                                     openEditCard={openEditCard}
                                                                     onToggleStatus={handleToggleStatus}
-                                                                    onToggleSubTask={handleToggleSubTask}
                                                                 />
                                                             ))}
                                                         </div>
@@ -446,7 +413,7 @@ export default function Board() {
                                 );
                             })}
                             <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.4' } } }) }}>
-                                {activeCard && <KanbanColumn id="overlay" team={activeCard.team} cards={[activeCard]}><SortableCardItem card={activeCard} openEditCard={openEditCard} onToggleStatus={handleToggleStatus} onToggleSubTask={handleToggleSubTask} /></KanbanColumn>}
+                                {activeCard && <KanbanColumn id="overlay" team={activeCard.team} cards={[activeCard]}><SortableCardItem card={activeCard} openEditCard={openEditCard} onToggleStatus={handleToggleStatus} /></KanbanColumn>}
                             </DragOverlay>
                         </DndContext>
                     </div>

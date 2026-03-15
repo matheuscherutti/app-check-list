@@ -7,7 +7,6 @@ interface SortableCardItemProps {
     card: Card;
     openEditCard: (card: Card) => void;
     onToggleStatus: (cardId: string, currentStatus: string) => void;
-    onToggleSubTask: (cardId: string, subTaskId: string, currentStatus: string) => void;
 }
 
 export default function SortableCardItem({ card, ...props }: SortableCardItemProps) {

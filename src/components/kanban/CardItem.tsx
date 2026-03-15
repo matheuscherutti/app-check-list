@@ -24,8 +24,8 @@ export default function CardItem({ card, openEditCard, onToggleStatus, onToggleS
         <div
             onClick={() => openEditCard(card)}
             className={`
-                bg-white border outline outline-1 outline-offset-[-1px] rounded-[1.25rem] p-3 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md transition-all flex flex-col cursor-pointer group/card
-                ${isConcluido ? 'outline-emerald-200 border-emerald-100' : 'outline-slate-200 border-slate-100'}
+                outline outline-1 outline-black rounded-[1.25rem] p-3 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md transition-all flex flex-col cursor-pointer group/card
+                ${isConcluido ? 'bg-emerald-100 text-slate-900' : 'bg-white text-slate-900'}
             `}
         >
             {/* Top Area */}
@@ -39,7 +39,7 @@ export default function CardItem({ card, openEditCard, onToggleStatus, onToggleS
                         <Menu size={16} strokeWidth={2.5} />
                     </button>
                     <div className="flex flex-col gap-0.5 min-w-0">
-                        <span className={`text-[13px] font-bold truncate ${isConcluido ? 'text-emerald-500' : 'text-slate-700'}`}>
+                        <span className={`text-[13px] font-bold truncate ${isConcluido ? 'text-emerald-900' : 'text-slate-900'}`}>
                             {card.title}
                         </span>
                         {hasSubTasks && (
@@ -54,7 +54,7 @@ export default function CardItem({ card, openEditCard, onToggleStatus, onToggleS
                 </div>
 
                 <div className="flex items-center gap-3 shrink-0 pl-3">
-                    <span className="text-[10px] font-black uppercase text-slate-400 bg-slate-100/80 px-3 py-1 rounded-md border border-slate-200/60 transition-colors group-hover/card:bg-slate-200/50">
+                    <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-md border border-black transition-colors ${isConcluido ? 'bg-emerald-200/50 text-emerald-900' : 'bg-slate-50 text-slate-800 group-hover/card:bg-slate-100'}`}>
                         {card.equipment}
                     </span>
 
@@ -78,9 +78,9 @@ export default function CardItem({ card, openEditCard, onToggleStatus, onToggleS
                                 e.stopPropagation();
                                 onToggleStatus(card.id, card.status);
                             }}
-                            className={`focus:outline-none active:scale-90 transition-transform ${isConcluido ? 'text-emerald-400' : 'text-slate-200 hover:text-blue-500'}`}
+                            className={`focus:outline-none active:scale-90 transition-transform ${isConcluido ? 'text-emerald-600' : 'text-slate-200 hover:text-blue-500'}`}
                         >
-                            {isConcluido ? <CheckCircle2 size={22} className="fill-emerald-50" strokeWidth={2.5} /> : <Circle size={22} strokeWidth={2.5} />}
+                            {isConcluido ? <CheckCircle2 size={22} className="fill-emerald-100" strokeWidth={2.5} /> : <Circle size={22} strokeWidth={2.5} />}
                         </button>
                     )}
                 </div>
@@ -116,9 +116,9 @@ export default function CardItem({ card, openEditCard, onToggleStatus, onToggleS
                                         e.stopPropagation();
                                         if (onToggleSubTask) onToggleSubTask(card.id, st.id, st.status);
                                     }}
-                                    className={`focus:outline-none active:scale-90 transition-transform ${isSubTaskConcluido ? 'text-emerald-400' : 'text-slate-200 hover:text-blue-500'}`}
+                                    className={`focus:outline-none active:scale-90 transition-transform ${isSubTaskConcluido ? 'text-emerald-600' : 'text-slate-300 hover:text-emerald-500'}`}
                                 >
-                                    {isSubTaskConcluido ? <CheckCircle2 size={16} className="fill-emerald-50" strokeWidth={2.5} /> : <Circle size={16} strokeWidth={2.5} />}
+                                    {isSubTaskConcluido ? <CheckCircle2 size={16} className="fill-white" strokeWidth={2.5} /> : <Circle size={16} strokeWidth={2.5} />}
                                 </button>
                             </div>
                         );

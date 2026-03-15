@@ -324,10 +324,10 @@ export default function Board() {
                                         key={eq}
                                         onClick={() => setEquipmentFilter(eq as any)}
                                         className={`
-                                            px-4 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all
+                                            px-4 py-[6px] rounded-xl text-[11px] font-black uppercase tracking-wider transition-all border border-black
                                             ${isSelected
-                                                ? 'bg-blue-600 text-white ring-4 ring-blue-50 shadow-sm outline-none'
-                                                : 'bg-white border border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-500'
+                                                ? 'bg-blue-600 text-white shadow-[2px_2px_0_rgba(0,0,0,1)]'
+                                                : 'bg-white text-slate-700 hover:bg-slate-50 hover:-translate-y-0.5 shadow-[1px_1px_0_rgba(0,0,0,1)]'
                                             }
                                         `}
                                     >
@@ -377,7 +377,7 @@ export default function Board() {
                                 const columnId = `col-team-${team}`;
 
                                 return (
-                                    <div key={team} className="bg-white border border-slate-200/70 shadow-sm rounded-3xl overflow-hidden transition-all duration-300">
+                                    <div key={team} className="bg-white border border-black shadow-sm rounded-3xl overflow-hidden transition-all duration-300">
                                         <button
                                             onClick={() => toggleTeam(team)}
                                             className="w-full px-6 py-5 flex items-center justify-between hover:bg-slate-50/50 transition-colors focus:outline-none"
@@ -415,7 +415,7 @@ export default function Board() {
 
                                                             return (
                                                                 <div key={eq} className="space-y-4">
-                                                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest pl-2 border-l-4 border-blue-500">{eq}</h3>
+                                                                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest pl-2 border-l-4 border-black">{eq}</h3>
                                                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                                                         {eqCards.map(card => (
                                                                             <SortableCardItem

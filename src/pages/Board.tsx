@@ -220,6 +220,16 @@ export default function Board() {
             subTasks: updatedSubTasks
         });
 
+        const subTaskName = currentSubTasks.find(s => s.id === subTaskId)?.title || 'subtarefa';
+
+        await auditLog({
+            user: currentUser?.name || 'Sistema',
+            action: newStatus === 'Concluído' ? 'Concluiu' : 'Editou',
+            target: cardDefinition.title,
+            details: `Subtarefa "${subTaskName}" marcada como ${newStatus}`,
+            timestamp: Date.now()
+        });
+
         if (allCompleted && currentData.status !== 'Concluído') {
             await auditLog({
                 user: currentUser?.name || 'Sistema',
@@ -251,14 +261,14 @@ export default function Board() {
 
     // --- Progress Calculations for the Header ---
     const allEqGroups: EquipmentGroup[] = ['A320', 'A330', 'ATR', 'ERJ', 'Cmros'];
-    const totalCurrentMonthCards = filteredCards.length;
-    const completedCurrentMonthCards = filteredCards.filter(c => c.status === 'Concluído').length;
+    const totalCurrentMonthCards = currentMonthCards.length;
+    const completedCurrentMonthCards = currentMonthCards.filter(c => c.status === 'Concluído').length;
     const globalPercentRaw = totalCurrentMonthCards === 0 ? 0 : (completedCurrentMonthCards / totalCurrentMonthCards);
     const globalProgress = Math.round(globalPercentRaw * 100);
     const globalDashOffset = 175.9 - (175.9 * globalPercentRaw);
 
     const eqProgressData = allEqGroups.map(eq => {
-        const eqCards = filteredCards.filter(c => c.equipment === eq);
+        const eqCards = currentMonthCards.filter(c => c.equipment === eq);
         const eqTotal = eqCards.length;
         const eqCompleted = eqCards.filter(c => c.status === 'Concluído').length;
         const eqPercent = eqTotal === 0 ? 0 : Math.round((eqCompleted / eqTotal) * 100);

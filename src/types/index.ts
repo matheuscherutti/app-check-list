@@ -19,6 +19,7 @@ export interface Card {
     subTasks?: SubTask[];
     notes?: string;
     startMonth?: string; // Format: yyyy-MM
+    endMonth?: string; // Format: yyyy-MM
     createdAt: number | Date;
 }
 

@@ -18,7 +18,6 @@ import {
     subscribeToMessages,
     subscribeToMonthlyData,
     upsertCard,
-    deleteCard,
     addMessage,
     updateMonthlyCardData,
     auditLog
@@ -73,7 +72,11 @@ export default function Board() {
     // Merge global card data with month-specific status/notes
     const currentMonthCards = useMemo(() => {
         return allCards
-            .filter(card => !card.startMonth || card.startMonth <= selectedMonth)
+            .filter(card => {
+                const startsInOrBefore = !card.startMonth || card.startMonth <= selectedMonth;
+                const hasNotEnded = !card.endMonth || selectedMonth < card.endMonth;
+                return startsInOrBefore && hasNotEnded;
+            })
             .map(card => {
                 const monthOverrides = monthlyData[selectedMonth]?.[card.id] || {};
                 return {
@@ -114,15 +117,17 @@ export default function Board() {
 
     const onDeleteCard = async (id: string) => {
         const card = allCards.find(c => c.id === id);
-        if (window.confirm('Deseja realmente excluir este card de todas as meses?')) {
-            await deleteCard(id);
-            await auditLog({
-                user: currentUser?.name || 'Sistema',
-                action: 'Deletou',
-                target: card?.title || 'Card desconhecido',
-                details: `Removido do sistema permanentemente`,
-                timestamp: Date.now()
-            });
+        if (window.confirm('Deseja realmente remover esta atividade? Ela continuará aparecendo nos meses anteriores, mas será removida deste mês para frente.')) {
+            if (card) {
+                await upsertCard({ ...card, endMonth: selectedMonth });
+                await auditLog({
+                    user: currentUser?.name || 'Sistema',
+                    action: 'Deletou',
+                    target: card.title,
+                    details: `Atividade encerrada a partir de ${selectedMonth} (Histórico preservado)`,
+                    timestamp: Date.now()
+                });
+            }
             closeModal();
         }
     };

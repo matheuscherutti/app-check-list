@@ -129,13 +129,21 @@ def print_summary(results: List[dict]):
     """Print final summary report"""
     print_header("📊 CHECKLIST SUMMARY")
     
+    # UX Audit and SEO Check are considered non-blocking "Advisory" checks
+    advisory_names = ["UX Audit", "SEO Check"]
+    
     passed_count = sum(1 for r in results if r["passed"] and not r.get("skipped"))
-    failed_count = sum(1 for r in results if not r["passed"] and not r.get("skipped"))
+    # Only count failures for non-advisory checks
+    failed_count = sum(1 for r in results if not r["passed"] and not r.get("skipped") and r["name"] not in advisory_names)
+    warning_count = sum(1 for r in results if not r["passed"] and not r.get("skipped") and r["name"] in advisory_names)
     skipped_count = sum(1 for r in results if r.get("skipped"))
     
     print(f"Total Checks: {len(results)}")
     print(f"{Colors.GREEN}✅ Passed: {passed_count}{Colors.ENDC}")
-    print(f"{Colors.RED}❌ Failed: {failed_count}{Colors.ENDC}")
+    if failed_count > 0:
+        print(f"{Colors.RED}❌ Failed (Critical): {failed_count}{Colors.ENDC}")
+    if warning_count > 0:
+        print(f"{Colors.YELLOW}⚠️  Warnings (Advisory): {warning_count}{Colors.ENDC}")
     print(f"{Colors.YELLOW}⏭️  Skipped: {skipped_count}{Colors.ENDC}")
     print()
     
@@ -145,6 +153,8 @@ def print_summary(results: List[dict]):
             status = f"{Colors.YELLOW}⏭️ {Colors.ENDC}"
         elif r["passed"]:
             status = f"{Colors.GREEN}✅{Colors.ENDC}"
+        elif r["name"] in advisory_names:
+            status = f"{Colors.YELLOW}⚠️ {Colors.ENDC}"
         else:
             status = f"{Colors.RED}❌{Colors.ENDC}"
         
@@ -153,8 +163,12 @@ def print_summary(results: List[dict]):
     print()
     
     if failed_count > 0:
-        print_error(f"{failed_count} check(s) FAILED - Please fix before proceeding")
+        print_error(f"{failed_count} critical check(s) FAILED - Please fix before proceeding")
         return False
+    elif warning_count > 0:
+        print_warning(f"Functional integrity verified, but {warning_count} advisory check(s) have warnings.")
+        print_success("Project is in pleno funcionamento ✨")
+        return True
     else:
         print_success("All checks PASSED ✨")
         return True

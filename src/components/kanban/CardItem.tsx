@@ -24,8 +24,8 @@ export default function CardItem({ card, openEditCard, onToggleStatus, onToggleS
         <div
             onClick={() => openEditCard(card)}
             className={`
-                outline outline-1 outline-black rounded-[1.25rem] p-3 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md transition-all flex flex-col cursor-pointer group/card
-                ${isConcluido ? 'bg-emerald-100 text-slate-900' : 'bg-white text-slate-900'}
+                border border-slate-100 rounded-[1.25rem] p-3 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all flex flex-col cursor-pointer group/card
+                ${isConcluido ? 'bg-emerald-50 text-slate-900 border-emerald-100/50' : 'bg-white text-slate-900'}
             `}
         >
             {/* Top Area */}
@@ -54,7 +54,7 @@ export default function CardItem({ card, openEditCard, onToggleStatus, onToggleS
                 </div>
 
                 <div className="flex items-center gap-3 shrink-0 pl-3">
-                    <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-md border border-black transition-colors ${isConcluido ? 'bg-emerald-200/50 text-emerald-900' : 'bg-slate-50 text-slate-800 group-hover/card:bg-slate-100'}`}>
+                    <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg transition-colors border ${isConcluido ? 'bg-emerald-200/30 text-emerald-700 border-emerald-200/50' : 'bg-slate-50 text-slate-500 border-slate-200/50 group-hover/card:bg-white group-hover/card:border-slate-300'}`}>
                         {card.equipment}
                     </span>
 

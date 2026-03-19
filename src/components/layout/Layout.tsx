@@ -3,6 +3,7 @@ import { useUserStore } from '../../stores/useUserStore';
 import { LogOut, Settings, LayoutDashboard, ScrollText } from 'lucide-react';
 import { useFilterStore } from '../../stores/useFilterStore';
 import MonthTabs from './MonthTabs';
+
 export default function Layout() {
     const { currentUser, logout } = useUserStore();
     const { selectedMonth, setSelectedMonth } = useFilterStore();
@@ -52,7 +53,7 @@ export default function Layout() {
             </header>
 
             {/* Main Content Area */}
-            <main className="flex-1 flex flex-col bg-background">
+            <main className="flex-1 flex flex-col bg-slate-50">
                 <Outlet />
             </main>
         </div>

@@ -35,21 +35,24 @@ graph TD
 
 **Use this matrix to automatically select agents:**
 
-| User Intent         | Keywords                                   | Selected Agent(s)                           | Auto-invoke? |
-| ------------------- | ------------------------------------------ | ------------------------------------------- | ------------ |
-| **Authentication**  | "login", "auth", "signup", "password"      | `security-auditor` + `backend-specialist`   | ✅ YES       |
-| **UI Component**    | "button", "card", "layout", "style"        | `frontend-specialist`                       | ✅ YES       |
-| **Mobile UI**       | "screen", "navigation", "touch", "gesture" | `mobile-developer`                          | ✅ YES       |
-| **API Endpoint**    | "endpoint", "route", "API", "POST", "GET"  | `backend-specialist`                        | ✅ YES       |
-| **Database**        | "schema", "migration", "query", "table"    | `database-architect` + `backend-specialist` | ✅ YES       |
-| **Bug Fix**         | "error", "bug", "not working", "broken"    | `debugger`                                  | ✅ YES       |
-| **Test**            | "test", "coverage", "unit", "e2e"          | `test-engineer`                             | ✅ YES       |
-| **Deployment**      | "deploy", "production", "CI/CD", "docker"  | `devops-engineer`                           | ✅ YES       |
-| **Security Review** | "security", "vulnerability", "exploit"     | `security-auditor` + `penetration-tester`   | ✅ YES       |
-| **Performance**     | "slow", "optimize", "performance", "speed" | `performance-optimizer`                     | ✅ YES       |
-| **Product Def**     | "requirements", "user story", "backlog", "MVP" | `product-owner`                             | ✅ YES       |
-| **New Feature**     | "build", "create", "implement", "new app"  | `orchestrator` → multi-agent                | ⚠️ ASK FIRST |
-| **Complex Task**    | Multiple domains detected                  | `orchestrator` → multi-agent                | ⚠️ ASK FIRST |
+| User Intent         | Keywords (EN / PT)                                           | Selected Agent(s)                           | Auto-invoke? |
+| ------------------- | ------------------------------------------------------------ | ------------------------------------------- | ------------ |
+| **Authentication**  | "login", "auth", "signup", "password" / "senha", "cadastro", "autenticação" | `security-auditor` + `backend-specialist`   | ✅ YES       |
+| **UI Component**    | "button", "card", "layout", "style" / "botão", "cartão", "visual", "estilo" | `frontend-specialist`                       | ✅ YES       |
+| **Mobile UI**       | "screen", "navigation", "touch" / "tela", "navegação", "toque", "celular" | `mobile-developer`                          | ✅ YES       |
+| **API Endpoint**    | "endpoint", "route", "API" / "rota", "servidor", "conectar front" | `backend-specialist`                        | ✅ YES       |
+| **Database**        | "schema", "query", "table" / "banco de dados", "tabela", "estrutura" | `database-architect` + `backend-specialist` | ✅ YES       |
+| **Bug Fix**         | "error", "bug", "broken" / "erro", "quebrado", "não funciona", "bug" | `debugger`                                  | ✅ YES       |
+| **Test**            | "test", "coverage", "unit" / "testar", "validar", "cobertura", "testes" | `test-engineer`                             | ✅ YES       |
+| **Deployment**      | "deploy", "CI/CD", "docker" / "publicar", "colocar no ar", "subir site" | `devops-engineer`                           | ✅ YES       |
+| **Security Review** | "security", "vulnerability" / "seguro", "vulnerabilidade", "ataque" | `security-auditor` + `penetration-tester`   | ✅ YES       |
+| **Performance**     | "slow", "optimize", "speed" / "lento", "rápido", "otimizar", "velocidade" | `performance-optimizer`                     | ✅ YES       |
+| **Product Def**     | "requirements", "MVP" / "requisitos", "ideia", "funcionalidades" | `product-owner`                             | ✅ YES       |
+| **Kit Health**      | "doctor", "diagnóstico", "checar kit" / "saúde", "integridade", "tá tudo certo" | *(scripts)* `doctor.py`                      | ✅ YES       |
+| **ADE Pipeline**    | "/ade", "pipeline autônomo" / "fazer tudo", "implementar autônomo" | `orchestrator` via `/ade`                   | ✅ YES       |
+| **Memory Layer**    | "lessons", "gotchas", "memory" / "lições", "aprendemos", "evitar erro" | Consultar `.agent/memory/`                  | ✅ YES       |
+| **Premium Design** | "premium design", "immersive", "awwwards", "gsap", "three.js" / "site premiado", "design de luxo", "animações premium", "interface imersiva", "5 pilares", "experiência imersiva", "design premium" | `frontend-specialist` + `premium-design-orchestrator` | ✅ YES       |
+| **Brand Extraction** | "extract identity", "clone design", "analyze reference" / "extrair identidade", "clonar design", "analisar referência", "extrair paleta", "copiar essência" | `brand-identity-extractor` | ✅ YES       |
 
 ### 3. Automatic Routing Protocol
 
@@ -100,19 +103,25 @@ function analyzeRequest(userMessage) {
 
 ### Single-Domain Tasks (Auto-invoke Single Agent)
 
-| Domain          | Patterns                                   | Agent                   |
-| --------------- | ------------------------------------------ | ----------------------- |
-| **Security**    | auth, login, jwt, password, hash, token    | `security-auditor`      |
-| **Frontend**    | component, react, vue, css, html, tailwind | `frontend-specialist`   |
-| **Backend**     | api, server, express, fastapi, node        | `backend-specialist`    |
-| **Mobile**      | react native, flutter, ios, android, expo  | `mobile-developer`      |
-| **Database**    | prisma, sql, mongodb, schema, migration    | `database-architect`    |
-| **Testing**     | test, jest, vitest, playwright, cypress    | `test-engineer`         |
-| **DevOps**      | docker, kubernetes, ci/cd, pm2, nginx      | `devops-engineer`       |
-| **Debug**       | error, bug, crash, not working, issue      | `debugger`              |
-| **Performance** | slow, lag, optimize, cache, performance    | `performance-optimizer` |
-| **SEO**         | seo, meta, analytics, sitemap, robots      | `seo-specialist`        |
-| **Game**        | unity, godot, phaser, game, multiplayer    | `game-developer`        |
+| Domain          | Patterns (EN + PT natural language)                                                  | Agent                   |
+| --------------- | ------------------------------------------------------------------------------------ | ----------------------- |
+| **Security**    | auth, login, jwt, password, hash, token, "tá seguro?", "pode ser hackeado?", "verificar segurança", "proteger dados" | `security-auditor` |
+| **Frontend**    | component, react, vue, css, html, tailwind, "deixa mais bonito", "muda o visual", "tá feio", "redesign", "interface moderna", "mudar cor", "dark mode", "modo escuro" | `frontend-specialist` |
+| **Backend**     | api, server, express, fastapi, node, "criar endpoint", "conectar com", "rota", "servidor", "API" | `backend-specialist` |
+| **Mobile**      | react native, flutter, ios, android, expo, "app mobile", "app para celular", "tela do celular" | `mobile-developer` |
+| **Database**    | prisma, sql, mongodb, schema, migration, "banco de dados", "tabela", "estrutura dos dados", "modelar dados" | `database-architect` |
+| **Testing**     | test, jest, vitest, playwright, cypress, "testar", "verificar qualidade", "tá funcionando?", "garantir que funciona", "rode os testes" | `test-engineer` |
+| **DevOps**      | docker, kubernetes, ci/cd, pm2, nginx, "colocar no ar", "publicar", "deploy", "servidor caiu" | `devops-engineer` |
+| **Debug**       | error, bug, crash, not working, issue, "não funciona", "tá quebrado", "dando erro", "travou", "tela branca", "não carrega", "bugado" | `debugger` |
+| **Performance** | slow, lag, optimize, cache, performance, "tá lento", "demora pra carregar", "site devagar", "pesado", "fica travando" | `performance-optimizer` |
+| **SEO**         | seo, meta, analytics, sitemap, robots, "aparecer no Google", "melhorar posição", "otimizar para buscadores", "mais visitas" | `seo-specialist` |
+| **Game**        | unity, godot, phaser, game, multiplayer, "criar jogo", "fazer um game", "jogo 2D" | `game-developer` |
+| **Kit Health**  | doctor, diagnóstico, "checar kit", "kit integridade", "saúde do kit", "tudo certo?", "verificar agente" | *(run doctor.py)* |
+| **ADE**         | /ade, "pipeline autônomo", "fazer tudo sozinho", "implementar de forma autônoma", "crie e entregue pronto" | `orchestrator`+`/ade` |
+| **Memory**      | "lições aprendidas", lessons, gotchas, "o que aprendemos", "evitar erro passado" | *.agent/memory/*  |
+| **Premium Design** | gsap, three.js, swup, awwwards, scroll suave, "design premium", "site premiado", "interface imersiva", "animações premium", "5 pilares", "experiência imersiva", "landing page premium", "paleta premium" | `frontend-specialist` + premium skills |
+| **Brand Extraction** | "extrair identidade", "clonar design", "analisar referência", "extrair paleta", "copiar essência", "extract brand", "analyze design" | `brand-identity-extractor` |
+
 
 ### Multi-Domain Tasks (Auto-invoke Orchestrator)
 

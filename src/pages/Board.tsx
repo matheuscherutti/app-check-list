@@ -155,12 +155,14 @@ export default function Board() {
             const newCard: Card = {
                 id: Math.random().toString(36).substr(2, 9),
                 title: data.title || '',
-                equipment: data.equipment as EquipmentGroup,
-                team: data.team as Team,
+                equipment: (data.equipment || 'A320') as EquipmentGroup,
+                team: (data.team || 'Pré Assigment') as Team,
                 status: 'Pendente',
+                order: cards.length,
                 isMultiTask: data.isMultiTask || false,
                 subTasks: data.subTasks || [],
-                notes: data.notes || ''
+                notes: data.notes || '',
+                createdAt: Date.now()
             };
             await upsertCard(newCard);
         }
@@ -184,15 +186,8 @@ export default function Board() {
 
     // --- Drag & Drop ---
     const handleDragOver = (event: DragOverEvent) => {
-        const { active, over } = event;
+        const { over } = event;
         if (!over) return;
-
-        const activeId = active.id as string;
-        const overId = over.id as string;
-
-        if (activeId !== overId) {
-            // Drag logic for cross-column move could go here
-        }
     };
 
     const handleDragEnd = async (event: DragEndEvent) => {

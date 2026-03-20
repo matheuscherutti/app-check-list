@@ -13,7 +13,10 @@ interface CardItemProps {
 export default function CardItem({ card, openEditCard, onToggleStatus, onToggleSubTask, dragHandleProps }: CardItemProps) {
     const [isExpanded, setIsExpanded] = useState(false);
 
-    const isConcluido = card.status === 'Concluído';
+    const isConcluido = card.isMultiTask
+        ? (card.subTasks && card.subTasks.length > 0 && card.subTasks.every(st => st.status === 'Concluído'))
+        : card.status === 'Concluído';
+
     const hasSubTasks = card.isMultiTask && Boolean(card.subTasks) && card.subTasks!.length > 0;
     const completedSubTasks = hasSubTasks ? card.subTasks!.filter(s => s.status === 'Concluído').length : 0;
     const totalSubTasks = hasSubTasks ? card.subTasks!.length : 0;

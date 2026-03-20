@@ -10,17 +10,16 @@ import {
     DndContext, closestCorners
 } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
-import type { Card, EquipmentGroup, Team } from '../types';
+import type { Card, EquipmentGroup, Team, Status } from '../types';
 import { Search, Plus, MessageSquare, ChevronDown, ChevronRight, Trash2, Filter } from 'lucide-react';
 import {
     subscribeToCards,
     subscribeToMessages,
     subscribeToMonthlyData,
-    upsertCard,
-    addMessage,
     updateMonthlyCardData,
     auditLog,
-    deleteCard,
+    upsertCard as upsertCardBase,
+    addMessage,
     deleteMessage
 } from '../lib/firestoreService';
 import type { Message } from '../lib/firestoreService';
@@ -87,21 +86,62 @@ export default function Board() {
         };
     }, [selectedMonth]);
 
-    // Merge global card data with monthly overrides
+    // Merge global card data with monthly overrides and versioning
     const mergedCards = useMemo(() => {
-        const monthData = monthlyData[selectedMonth] || {};
-        return cards.map(card => {
-            const override = monthData[card.id] || {};
-            return {
-                ...card,
-                status: override.status || card.status,
-                notes: override.notes || card.notes,
-                subTasks: card.subTasks?.map(st => ({
+        // Encontrar meses com overrides
+        const allMonths = Object.keys(monthlyData).sort();
+
+        return cards
+            .filter(c => {
+                // Filtro Temporal: Ativo desde o mês X e até o mês Y
+                const isAfterStart = c.activeFrom <= selectedMonth;
+                const isBeforeEnd = !c.activeUntil || c.activeUntil > selectedMonth;
+                return isAfterStart && isBeforeEnd;
+            })
+            .map(card => {
+                // 1. Buscar Overrides (Título, Equipe, Time) - O mais recente <= selectedMonth vence
+                let title = card.title;
+                let team = card.team;
+                let equipment = card.equipment;
+
+                const previousMonthsWithOverrides = allMonths.filter(m => m <= selectedMonth).reverse();
+                for (const m of previousMonthsWithOverrides) {
+                    const override = monthlyData[m]?.[card.id]?.overrides;
+                    if (override) {
+                        if (override.title) title = override.title;
+                        if (override.team) team = override.team;
+                        if (override.equipment) equipment = override.equipment;
+                        break; // Achamos a "versão" mais recente para este mês
+                    }
+                }
+
+                // 2. Buscar Status e Notas (Específicos deste mês)
+                const monthInfo = (monthlyData[selectedMonth] && monthlyData[selectedMonth][card.id]) || {};
+
+                // Mapear sub-tarefas com seus status específicos deste mês
+                const subTasks = card.subTasks?.map(st => ({
                     ...st,
-                    status: (override.subTasksStatuses && override.subTasksStatuses[st.id]) || st.status
-                }))
-            };
-        });
+                    status: (monthInfo.subTasksStatuses && monthInfo.subTasksStatuses[st.id]) || st.status
+                })) || [];
+
+                // Lógica Visual: Card multi-tarefa é considerado Concluído apenas se TODAS sub-tarefas estão OK
+                const isActuallyCompleted = card.isMultiTask
+                    ? (subTasks.length > 0 && subTasks.every(st => st.status === 'Concluído'))
+                    : (monthInfo.status || card.status) === 'Concluído';
+
+                return {
+                    ...card,
+                    title,
+                    team,
+                    equipment: equipment as EquipmentGroup,
+                    status: (isActuallyCompleted ? 'Concluído' : 'Pendente') as Status,
+                    notes: monthInfo.notes || card.notes,
+                    subTasks: subTasks.map(st => ({
+                        ...st,
+                        status: (st.status || 'Pendente') as Status
+                    }))
+                } as Card;
+            });
     }, [cards, monthlyData, selectedMonth]);
 
     // Filtering logic
@@ -121,12 +161,15 @@ export default function Board() {
     // --- Actions ---
     const handleToggleStatus = async (cardId: string, currentStatus: string) => {
         const newStatus = currentStatus === 'Concluído' ? 'Pendente' : 'Concluído';
+        const card = cards.find(c => c.id === cardId);
+        if (!card) return;
+
         await updateMonthlyCardData(selectedMonth, cardId, { status: newStatus });
 
         await auditLog({
             user: currentUser?.name || 'Desconhecido',
             action: 'Concluiu',
-            target: cardId,
+            target: card.title,
             details: `Status alterado para ${newStatus} no mês ${selectedMonth}`,
             timestamp: Date.now()
         });
@@ -144,12 +187,45 @@ export default function Board() {
         await updateMonthlyCardData(selectedMonth, cardId, { subTasksStatuses });
     };
 
+    const upsertCard = async (card: Card) => {
+        const safeCard = {
+            ...card,
+            activeFrom: card.activeFrom || selectedMonth
+        };
+        await upsertCardBase(safeCard);
+    };
+
     const handleSaveCard = async (data: Partial<Card>) => {
         if (editingCard) {
-            await upsertCard({ ...editingCard, ...data } as Card);
+            const hasChanges = (data.title && data.title !== editingCard.title) ||
+                (data.team && data.team !== editingCard.team) ||
+                (data.equipment && data.equipment !== editingCard.equipment);
+
+            if (hasChanges) {
+                await updateMonthlyCardData(selectedMonth, editingCard.id, {
+                    overrides: {
+                        title: data.title,
+                        team: data.team,
+                        equipment: data.equipment
+                    }
+                });
+
+                await auditLog({
+                    user: currentUser?.name || 'Desconhecido',
+                    action: 'Editou',
+                    target: data.title || editingCard.title,
+                    details: `Alterou propriedades globais no mês ${selectedMonth}. Mudança afeta este mês e futuros.`,
+                    timestamp: Date.now()
+                });
+            } else {
+                await updateMonthlyCardData(selectedMonth, editingCard.id, {
+                    notes: data.notes
+                });
+            }
         } else {
+            const cardId = Math.random().toString(36).substr(2, 9);
             const newCard: Card = {
-                id: Math.random().toString(36).substr(2, 9),
+                id: cardId,
                 title: data.title || '',
                 equipment: (data.equipment || 'A320') as EquipmentGroup,
                 team: (data.team || 'Pré Assigment') as Team,
@@ -158,16 +234,36 @@ export default function Board() {
                 isMultiTask: data.isMultiTask || false,
                 subTasks: data.subTasks || [],
                 notes: data.notes || '',
+                activeFrom: selectedMonth,
                 createdAt: Date.now()
             };
             await upsertCard(newCard);
+
+            await auditLog({
+                user: currentUser?.name || 'Desconhecido',
+                action: 'Criou',
+                target: newCard.title,
+                details: `Atividade criada no controle de ${selectedMonth}`,
+                timestamp: Date.now()
+            });
         }
         closeModal();
     };
 
     const handleDeleteCard = async (id: string) => {
-        if (window.confirm('Tem certeza que deseja excluir esta atividade?')) {
-            await deleteCard(id);
+        const card = cards.find(c => c.id === id);
+        if (!card) return;
+
+        if (window.confirm(`Tem certeza que deseja remover "${card.title}" a partir de ${selectedMonth}? (O histórico de meses anteriores será preservado)`)) {
+            await upsertCard({ ...card, activeUntil: selectedMonth });
+
+            await auditLog({
+                user: currentUser?.name || 'Desconhecido',
+                action: 'Deletou',
+                target: card.title,
+                details: `Atividade removida do controle a partir de ${selectedMonth}`,
+                timestamp: Date.now()
+            });
             closeModal();
         }
     };
@@ -201,8 +297,8 @@ export default function Board() {
                 await auditLog({
                     user: currentUser?.name || 'Desconhecido',
                     action: 'Moveu',
-                    target: activeCard.id,
-                    details: `Movido para equipe ${overId}`,
+                    target: activeCard.title,
+                    details: `Movido para equipe ${overId} no mês ${selectedMonth}`,
                     timestamp: Date.now()
                 });
             }

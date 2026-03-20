@@ -18,8 +18,10 @@ export interface Card {
     isMultiTask?: boolean;
     subTasks?: SubTask[];
     notes?: string;
-    startMonth?: string; // Format: yyyy-MM
-    endMonth?: string; // Format: yyyy-MM
+    activeFrom: string; // Format: yyyy-MM
+    activeUntil?: string | null; // Format: yyyy-MM
+    startMonth?: string; // Legacy
+    endMonth?: string; // Legacy
     createdAt: number | Date;
 }
 

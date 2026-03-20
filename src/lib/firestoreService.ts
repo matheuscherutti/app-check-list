@@ -24,7 +24,7 @@ export interface AuditEntry {
     id: string;
     user: string;
     action: 'Criou' | 'Editou' | 'Deletou' | 'Moveu' | 'Concluiu';
-    target: string;
+    target: string; // Title or ID
     details: string;
     timestamp: number;
 }
@@ -127,11 +127,9 @@ export const auditLog = async (entry: Omit<AuditEntry, 'id'>) => {
 };
 
 export const subscribeToLogs = (callback: (logs: AuditEntry[]) => void) => {
-    const q = query(collection(db, LOGS_COLLECTION));
+    const q = query(collection(db, LOGS_COLLECTION), orderBy('timestamp', 'desc'));
     return onSnapshot(q, (snapshot) => {
-        const logs = snapshot.docs
-            .map(doc => ({ ...doc.data(), id: doc.id } as AuditEntry))
-            .sort((a, b) => b.timestamp - a.timestamp);
+        const logs = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as AuditEntry));
         callback(logs);
     });
 };

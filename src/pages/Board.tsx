@@ -561,7 +561,6 @@ export default function Board() {
                 card={editingCard}
                 onSave={handleSaveCard}
                 onDelete={handleDeleteCard}
-                isAdmin={isAdmin}
             />
         </div>
     );

@@ -8,13 +8,12 @@ interface CardModalProps {
     card?: Card;
     onDelete?: (id: string) => void;
     onSave: (data: Partial<Card>) => void;
-    isAdmin: boolean;
 }
 
 const GROUPS: EquipmentGroup[] = ['A320', 'A330', 'ATR', 'ERJ', 'Cmros'];
 const TEAMS: Team[] = ['Pré Assigment', 'Jeppesen', 'CAE'];
 
-export default function CardModal({ isOpen, onClose, card, onDelete, onSave, isAdmin }: CardModalProps) {
+export default function CardModal({ isOpen, onClose, card, onDelete, onSave }: CardModalProps) {
     const isEditing = !!card;
 
     const [title, setTitle] = useState('');
@@ -125,8 +124,7 @@ export default function CardModal({ isOpen, onClose, card, onDelete, onSave, isA
                                 <select
                                     value={equipment}
                                     onChange={(e) => setEquipment(e.target.value as EquipmentGroup)}
-                                    className="w-full border-slate-200 rounded-xl p-3 text-sm font-bold bg-slate-50 disabled:opacity-50"
-                                    disabled={isEditing || !isAdmin}
+                                    className="w-full border-slate-200 rounded-xl p-3 text-sm font-bold bg-slate-50"
                                 >
                                     {GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
                                 </select>
@@ -136,8 +134,7 @@ export default function CardModal({ isOpen, onClose, card, onDelete, onSave, isA
                                 <select
                                     value={team}
                                     onChange={(e) => setTeam(e.target.value as Team)}
-                                    className="w-full border-slate-200 rounded-xl p-3 text-sm font-bold disabled:opacity-50"
-                                    disabled={!isAdmin}
+                                    className="w-full border-slate-200 rounded-xl p-3 text-sm font-bold"
                                 >
                                     {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
                                 </select>

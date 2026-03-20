@@ -278,10 +278,12 @@ export default function Board() {
                                                 </KanbanColumn>
                                             </div>
                                         ))}
-                                        <button onClick={openNewCard} className="mt-2 w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:text-blue-500 hover:border-blue-200 hover:bg-white transition-all flex flex-col items-center justify-center gap-1 group">
-                                            <Plus size={20} className="group-hover:scale-110" />
-                                            <span className="text-[10px] font-black uppercase tracking-widest">Novo Item</span>
-                                        </button>
+                                        {isAdmin && (
+                                            <button onClick={openNewCard} className="mt-2 w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:text-blue-500 hover:border-blue-200 hover:bg-white transition-all flex flex-col items-center justify-center gap-1 group">
+                                                <Plus size={20} className="group-hover:scale-110" />
+                                                <span className="text-[10px] font-black uppercase tracking-widest">Novo Item</span>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -385,6 +387,7 @@ export default function Board() {
                 card={editingCard}
                 onSave={handleSaveCard}
                 onDelete={handleDeleteCard}
+                isAdmin={isAdmin}
             />
         </div>
     );

@@ -8,12 +8,13 @@ interface CardModalProps {
     card?: Card;
     onDelete?: (id: string) => void;
     onSave: (data: Partial<Card>) => void;
+    isAdmin: boolean;
 }
 
 const GROUPS: EquipmentGroup[] = ['A320', 'A330', 'ATR', 'ERJ', 'Cmros'];
 const TEAMS: Team[] = ['Pré Assigment', 'Jeppesen', 'CAE'];
 
-export default function CardModal({ isOpen, onClose, card, onDelete, onSave }: CardModalProps) {
+export default function CardModal({ isOpen, onClose, card, onDelete, onSave, isAdmin }: CardModalProps) {
     const isEditing = !!card;
 
     const [title, setTitle] = useState('');
@@ -125,7 +126,7 @@ export default function CardModal({ isOpen, onClose, card, onDelete, onSave }: C
                                     value={equipment}
                                     onChange={(e) => setEquipment(e.target.value as EquipmentGroup)}
                                     className="w-full border-slate-200 rounded-xl p-3 text-sm font-bold bg-slate-50 disabled:opacity-50"
-                                    disabled={isEditing}
+                                    disabled={isEditing || !isAdmin}
                                 >
                                     {GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
                                 </select>
@@ -135,7 +136,8 @@ export default function CardModal({ isOpen, onClose, card, onDelete, onSave }: C
                                 <select
                                     value={team}
                                     onChange={(e) => setTeam(e.target.value as Team)}
-                                    className="w-full border-slate-200 rounded-xl p-3 text-sm font-bold"
+                                    className="w-full border-slate-200 rounded-xl p-3 text-sm font-bold disabled:opacity-50"
+                                    disabled={!isAdmin}
                                 >
                                     {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
                                 </select>
@@ -210,7 +212,7 @@ export default function CardModal({ isOpen, onClose, card, onDelete, onSave }: C
                 {/* Footer */}
                 <div className="p-6 px-8 border-t border-slate-100 bg-slate-50/30 flex justify-between items-center">
                     <div>
-                        {isEditing && (
+                        {isEditing && isAdmin && (
                             <button
                                 onClick={handleConfirmDelete}
                                 className="flex items-center gap-2 text-sm font-bold text-red-400 hover:text-red-600 transition-colors p-2 -ml-2"

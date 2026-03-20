@@ -9,9 +9,10 @@ import Dashboards from '../components/layout/Dashboards';
 import {
     DndContext, closestCorners
 } from '@dnd-kit/core';
+import { arrayMove } from '@dnd-kit/sortable';
 import type { DragEndEvent } from '@dnd-kit/core';
 import type { Card, EquipmentGroup, Team, Status } from '../types';
-import { Search, Plus, MessageSquare, ChevronDown, ChevronRight, Trash2, Filter } from 'lucide-react';
+import { Search, Plus, MessageSquare, ChevronDown, ChevronRight, Trash2, Filter, ChevronLeft } from 'lucide-react';
 import {
     subscribeToCards,
     subscribeToMessages,
@@ -67,6 +68,7 @@ export default function Board() {
     const [cards, setCards] = useState<Card[]>([]);
     const [messages, setMessages] = useState<Message[]>([]);
     const [monthlyData, setMonthlyData] = useState<Record<string, any>>({});
+    const [isMuralExpanded, setIsMuralExpanded] = useState(true);
     const [expandedTeams, setExpandedTeams] = useState<Record<string, boolean>>({
         'Pré Assigment': true,
         'Jeppesen': true,
@@ -75,7 +77,11 @@ export default function Board() {
 
     // --- Subscriptions ---
     useEffect(() => {
-        const unsubCards = subscribeToCards((data) => setCards(data));
+        const unsubCards = subscribeToCards((data) => {
+            // Sort locally by order field
+            const sortedData = [...data].sort((a, b) => (a.order || 0) - (b.order || 0));
+            setCards(sortedData);
+        });
         const unsubMsg = subscribeToMessages(selectedMonth, (data) => setMessages(data));
         const unsubMonthly = subscribeToMonthlyData((data) => setMonthlyData(data));
 
@@ -88,18 +94,15 @@ export default function Board() {
 
     // Merge global card data with monthly overrides and versioning
     const mergedCards = useMemo(() => {
-        // Encontrar meses com overrides
         const allMonths = Object.keys(monthlyData).sort();
 
         return cards
             .filter(c => {
-                // Filtro Temporal: Ativo desde o mês X e até o mês Y
-                const isAfterStart = c.activeFrom <= selectedMonth;
+                const isAfterStart = (c.activeFrom || '') <= selectedMonth;
                 const isBeforeEnd = !c.activeUntil || c.activeUntil > selectedMonth;
                 return isAfterStart && isBeforeEnd;
             })
             .map(card => {
-                // 1. Buscar Overrides (Título, Equipe, Time) - O mais recente <= selectedMonth vence
                 let title = card.title;
                 let team = card.team;
                 let equipment = card.equipment;
@@ -111,20 +114,17 @@ export default function Board() {
                         if (override.title) title = override.title;
                         if (override.team) team = override.team;
                         if (override.equipment) equipment = override.equipment;
-                        break; // Achamos a "versão" mais recente para este mês
+                        break;
                     }
                 }
 
-                // 2. Buscar Status e Notas (Específicos deste mês)
                 const monthInfo = (monthlyData[selectedMonth] && monthlyData[selectedMonth][card.id]) || {};
 
-                // Mapear sub-tarefas com seus status específicos deste mês
                 const subTasks = card.subTasks?.map(st => ({
                     ...st,
                     status: (monthInfo.subTasksStatuses && monthInfo.subTasksStatuses[st.id]) || st.status
                 })) || [];
 
-                // Lógica Visual: Card multi-tarefa é considerado Concluído apenas se TODAS sub-tarefas estão OK
                 const isActuallyCompleted = card.isMultiTask
                     ? (subTasks.length > 0 && subTasks.every(st => st.status === 'Concluído'))
                     : (monthInfo.status || card.status) === 'Concluído';
@@ -288,20 +288,84 @@ export default function Board() {
         const { active, over } = event;
         if (!over) return;
 
-        const activeCard = cards.find(c => c.id === active.id);
+        const activeId = active.id as string;
         const overId = over.id as string;
 
-        if (TEAMS.includes(overId as Team)) {
-            if (activeCard && activeCard.team !== overId) {
-                await upsertCard({ ...activeCard, team: overId as Team });
-                await auditLog({
-                    user: currentUser?.name || 'Desconhecido',
-                    action: 'Moveu',
-                    target: activeCard.title,
-                    details: `Movido para equipe ${overId} no mês ${selectedMonth}`,
-                    timestamp: Date.now()
-                });
+        const activeCard = cards.find(c => c.id === activeId);
+        if (!activeCard) return;
+
+        // Extract target container/card details
+        let targetTeam = activeCard.team;
+        let targetEquip = activeCard.equipment;
+        let isReordering = false;
+
+        // Case 1: Dragging over a Column container (id format: "Team-Equip")
+        if (overId.includes('-')) {
+            const [teamPart, equipPart] = overId.split('-');
+            if (TEAMS.includes(teamPart as Team)) {
+                targetTeam = teamPart as Team;
+                targetEquip = equipPart as EquipmentGroup;
             }
+        }
+        // Case 2: Dragging over another card
+        else {
+            const overCard = cards.find(c => c.id === overId);
+            if (overCard) {
+                targetTeam = overCard.team;
+                targetEquip = overCard.equipment;
+                isReordering = true;
+            }
+        }
+
+        // Determine the cards within the target group
+        const targetGroupCards = [...cards]
+            .filter(c => c.team === targetTeam && c.equipment === targetEquip)
+            .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+        let newCardsForGroup = [...targetGroupCards];
+
+        if (isReordering) {
+            const overIndexInGroup = targetGroupCards.findIndex(c => c.id === overId);
+            const activeIndexInGroup = targetGroupCards.findIndex(c => c.id === activeId);
+
+            if (activeIndexInGroup !== -1) {
+                // Moving within same group
+                newCardsForGroup = arrayMove(targetGroupCards, activeIndexInGroup, overIndexInGroup);
+            } else {
+                // Moving to a new group at a specific position
+                activeCard.team = targetTeam;
+                activeCard.equipment = targetEquip;
+                newCardsForGroup.splice(overIndexInGroup, 0, activeCard);
+            }
+        } else {
+            // Drop in empty area of column - append to end if not already there or different group
+            if (activeCard.team !== targetTeam || activeCard.equipment !== targetEquip) {
+                activeCard.team = targetTeam;
+                activeCard.equipment = targetEquip;
+                newCardsForGroup.push(activeCard);
+            }
+        }
+
+        // Persistence: Re-index orders for the entire target group to ensure consistency
+        const updatePromises = newCardsForGroup.map((card, index) => {
+            const updatedCard = { ...card, order: index };
+            return upsertCardBase(updatedCard);
+        });
+
+        await Promise.all(updatePromises);
+
+        // Audit logs
+        const teamChanged = activeCard.team !== targetTeam;
+        const equipChanged = activeCard.equipment !== targetEquip;
+
+        if (teamChanged || equipChanged) {
+            await auditLog({
+                user: currentUser?.name || 'Desconhecido',
+                action: 'Moveu',
+                target: activeCard.title,
+                details: `Movido para ${targetTeam} (${targetEquip}) no mês ${selectedMonth}`,
+                timestamp: Date.now()
+            });
         }
     };
 
@@ -374,12 +438,11 @@ export default function Board() {
                                                 </KanbanColumn>
                                             </div>
                                         ))}
-                                        {isAdmin && (
-                                            <button onClick={openNewCard} className="mt-2 w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:text-blue-500 hover:border-blue-200 hover:bg-white transition-all flex flex-col items-center justify-center gap-1 group">
-                                                <Plus size={20} className="group-hover:scale-110" />
-                                                <span className="text-[10px] font-black uppercase tracking-widest">Novo Item</span>
-                                            </button>
-                                        )}
+                                        {/* Permissão para todos os usuários inserirem cards */}
+                                        <button onClick={openNewCard} className="mt-2 w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:text-blue-500 hover:border-blue-200 hover:bg-white transition-all flex flex-col items-center justify-center gap-1 group">
+                                            <Plus size={20} className="group-hover:scale-110" />
+                                            <span className="text-[10px] font-black uppercase tracking-widest">Novo Item</span>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -387,53 +450,68 @@ export default function Board() {
                     })}
                 </DndContext>
 
-                {/* Mural de Recados com Deletar para Admins */}
-                <div className="min-w-[320px] bg-white border border-slate-200 rounded-[2.5rem] shadow-xl flex flex-col overflow-hidden mb-4">
-                    <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-600 rounded-xl shadow-lg shadow-blue-500/10 text-white"><MessageSquare size={18} /></div>
-                            <span className="font-black text-sm uppercase tracking-widest text-slate-800">Mural Mensal</span>
-                        </div>
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 scrollbar-hide">
-                        {messages.length === 0 ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-slate-300 italic py-20 text-center">
-                                <MessageSquare size={40} className="mb-2 opacity-10" />
-                                <p className="text-xs font-bold uppercase tracking-widest opacity-40">Sem avisos</p>
-                            </div>
-                        ) : (
-                            messages.map((msg) => (
-                                <div key={msg.id} className="relative bg-slate-50 p-4 rounded-2xl border border-slate-100 group/msg">
-                                    <p className="text-sm font-medium text-slate-700 leading-relaxed pr-6">{msg.text}</p>
-                                    <div className="flex items-center justify-between mt-2">
-                                        <span className="text-[10px] font-black text-blue-600 uppercase">{msg.userName}</span>
-                                        <span className="text-[9px] font-bold text-slate-300">{new Date(msg.createdAt).toLocaleDateString()}</span>
-                                    </div>
-                                    {isAdmin && (
-                                        <button
-                                            onClick={() => handleDeleteMessage(msg.id)}
-                                            className="absolute top-3 right-3 p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover/msg:opacity-100 transition-all rounded-lg"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    )}
+                {/* Mural de Recados Retrátil */}
+                <div className={`transition-all duration-500 ease-in-out bg-white border border-slate-200 rounded-[2.5rem] shadow-xl flex flex-col overflow-hidden mb-4 ${isMuralExpanded ? 'min-w-[320px] w-[320px]' : 'min-w-[80px] w-[80px]'}`}>
+                    <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between cursor-pointer" onClick={() => setIsMuralExpanded(!isMuralExpanded)}>
+                        {isMuralExpanded ? (
+                            <>
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-blue-600 rounded-xl shadow-lg shadow-blue-500/10 text-white"><MessageSquare size={18} /></div>
+                                    <span className="font-black text-sm uppercase tracking-widest text-slate-800">Mural</span>
                                 </div>
-                            ))
+                                <ChevronRight size={18} className="text-slate-400 rotate-180" />
+                            </>
+                        ) : (
+                            <div className="w-full flex flex-col items-center gap-4">
+                                <div className="p-2 bg-slate-100 rounded-xl text-slate-400"><MessageSquare size={18} /></div>
+                                <ChevronLeft size={18} className="text-slate-400" />
+                            </div>
                         )}
                     </div>
-                    <div className="p-6 bg-slate-50 border-t border-slate-100">
-                        <input
-                            type="text"
-                            placeholder="Postar no mural..."
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    handleSendMessage((e.target as HTMLInputElement).value);
-                                    (e.target as HTMLInputElement).value = '';
-                                }
-                            }}
-                            className="w-full bg-white border border-slate-200 rounded-2xl py-3 px-4 text-sm font-bold focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
-                        />
-                    </div>
+
+                    {isMuralExpanded && (
+                        <>
+                            <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 scrollbar-hide animate-in fade-in slide-in-from-right-4 duration-300">
+                                {messages.length === 0 ? (
+                                    <div className="flex-1 flex flex-col items-center justify-center text-slate-300 italic py-20 text-center">
+                                        <MessageSquare size={40} className="mb-2 opacity-10" />
+                                        <p className="text-xs font-bold uppercase tracking-widest opacity-40">Sem avisos</p>
+                                    </div>
+                                ) : (
+                                    messages.map((msg) => (
+                                        <div key={msg.id} className="relative bg-slate-50 p-4 rounded-2xl border border-slate-100 group/msg">
+                                            <p className="text-sm font-medium text-slate-700 leading-relaxed pr-6">{msg.text}</p>
+                                            <div className="flex items-center justify-between mt-2">
+                                                <span className="text-[10px] font-black text-blue-600 uppercase">{msg.userName}</span>
+                                                <span className="text-[9px] font-bold text-slate-300">{new Date(msg.createdAt).toLocaleDateString()}</span>
+                                            </div>
+                                            {isAdmin && (
+                                                <button
+                                                    onClick={() => handleDeleteMessage(msg.id)}
+                                                    className="absolute top-3 right-3 p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover/msg:opacity-100 transition-all rounded-lg"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                            <div className="p-6 bg-slate-50 border-t border-slate-100">
+                                <input
+                                    type="text"
+                                    placeholder="Postar no mural..."
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            handleSendMessage((e.target as HTMLInputElement).value);
+                                            (e.target as HTMLInputElement).value = '';
+                                        }
+                                    }}
+                                    className="w-full bg-white border border-slate-200 rounded-2xl py-3 px-4 text-sm font-bold focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                                />
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
 

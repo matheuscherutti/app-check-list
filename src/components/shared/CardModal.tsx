@@ -212,7 +212,7 @@ export default function CardModal({ isOpen, onClose, card, onDelete, onSave, isA
                 {/* Footer */}
                 <div className="p-6 px-8 border-t border-slate-100 bg-slate-50/30 flex justify-between items-center">
                     <div>
-                        {isEditing && isAdmin && (
+                        {isEditing && (
                             <button
                                 onClick={handleConfirmDelete}
                                 className="flex items-center gap-2 text-sm font-bold text-red-400 hover:text-red-600 transition-colors p-2 -ml-2"

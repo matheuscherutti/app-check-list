@@ -46,41 +46,58 @@ export default function Dashboards({ cards }: DashboardsProps) {
     }, [cards]);
 
     return (
-        <div className="bg-white border-b border-slate-200 py-3 shadow-sm">
-            <div className="max-w-[1600px] mx-auto px-6 flex items-center justify-between gap-8 overflow-x-auto no-scrollbar">
-                {/* Compact Global Progress */}
-                <div className="flex items-center gap-6 shrink-0 border-r border-slate-100 pr-10">
-                    <div className="relative w-20 h-20 flex items-center justify-center">
-                        <svg width="80" height="80" className="transform -rotate-90">
-                            <circle cx="40" cy="40" r="34" fill="transparent" stroke="#f1f5f9" strokeWidth="8" />
+        <div className="bg-white/40 backdrop-blur-md border-b border-slate-200/60 py-4 mb-2 animate-in fade-in slide-in-from-top-4 duration-700">
+            <div className="max-w-[1600px] mx-auto px-8 flex items-center justify-between gap-12 overflow-x-auto scrollbar-hide">
+
+                {/* Status Global - Capsule Design */}
+                <div className="flex items-center gap-5 shrink-0 pr-10 border-r border-slate-200/50">
+                    <div className="relative w-16 h-16 flex items-center justify-center">
+                        <svg width="64" height="64" className="transform -rotate-90 drop-shadow-sm">
+                            <circle cx="32" cy="32" r="28" fill="transparent" stroke="rgba(203, 213, 225, 0.3)" strokeWidth="6" />
                             <circle
-                                cx="40" cy="40" r="34" fill="transparent" stroke="#2563eb" strokeWidth="8"
-                                strokeDasharray={213.6}
-                                strokeDashoffset={213.6 - (calculations.progressTotal / 100) * 213.6}
+                                cx="32" cy="32" r="28" fill="transparent" stroke="url(#blue-gradient)" strokeWidth="6"
+                                strokeDasharray={175.9}
+                                strokeDashoffset={175.9 - (calculations.progressTotal / 100) * 175.9}
                                 strokeLinecap="round"
+                                className="transition-all duration-1000 ease-out"
                             />
+                            <defs>
+                                <linearGradient id="blue-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stopColor="#2563eb" />
+                                    <stop offset="100%" stopColor="#0891b2" />
+                                </linearGradient>
+                            </defs>
                         </svg>
-                        <span className="absolute text-sm font-black text-slate-800">{calculations.progressTotal}%</span>
+                        <span className="absolute text-xs font-black text-slate-800 tracking-tighter">{calculations.progressTotal}%</span>
                     </div>
                     <div>
-                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Status Global</h4>
-                        <p className="text-sm font-bold text-deep-navy">{calculations.total} Cards Ativos</p>
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight mb-0.5">Faturamento Global</h4>
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-xl font-black text-slate-900 leading-none">{calculations.total}</span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">Cards</span>
+                        </div>
                     </div>
                 </div>
 
-                {/* Horizontal Equipment Progress */}
-                <div className="flex-1 flex gap-8 items-center py-2">
+                {/* Progressão por Equipamento - Premium Horizontal Bars */}
+                <div className="flex-1 flex gap-10 items-center min-w-max">
                     {calculations.byEquipment.map((eq) => (
-                        <div key={eq.group} className="min-w-[140px] flex-1">
-                            <div className="flex justify-between text-[10px] font-black text-slate-600 uppercase tracking-widest mb-2">
-                                <span>{eq.group}</span>
-                                <span className="text-primary-600 font-black">{eq.progress}%</span>
+                        <div key={eq.group} className="min-w-[140px] flex-1 group">
+                            <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 transition-colors group-hover:text-slate-800">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500/40 group-hover:bg-blue-600 transition-colors"></span>
+                                    <span>{eq.group}</span>
+                                </div>
+                                <span className="text-blue-600 font-black">{eq.progress}%</span>
                             </div>
-                            <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                            <div className="h-2 bg-slate-100/80 rounded-full overflow-hidden border border-slate-200/20 shadow-inner p-[1px]">
                                 <div
-                                    className="h-full bg-primary-600 rounded-full transition-all duration-700 shadow-sm"
+                                    className="h-full bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full transition-all duration-1000 ease-out shadow-sm"
                                     style={{ width: `${eq.progress}%` }}
                                 />
+                            </div>
+                            <div className="mt-1.5 flex justify-end">
+                                <span className="text-[9px] font-bold text-slate-300 uppercase tracking-tighter">{eq.total} atividades</span>
                             </div>
                         </div>
                     ))}
@@ -89,4 +106,3 @@ export default function Dashboards({ cards }: DashboardsProps) {
         </div>
     );
 }
-

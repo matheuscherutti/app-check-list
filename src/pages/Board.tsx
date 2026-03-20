@@ -5,14 +5,13 @@ import { useUserStore } from '../stores/useUserStore';
 import CardModal from '../components/shared/CardModal';
 import KanbanColumn from '../components/kanban/KanbanColumn';
 import SortableCardItem from '../components/kanban/SortableCardItem';
+import Dashboards from '../components/layout/Dashboards';
 import {
-    DndContext, closestCorners, KeyboardSensor,
-    PointerSensor, useSensor, useSensors
+    DndContext, closestCorners
 } from '@dnd-kit/core';
-import type { DragOverEvent, DragEndEvent } from '@dnd-kit/core';
-import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import type { DragEndEvent } from '@dnd-kit/core';
 import type { Card, EquipmentGroup, Team } from '../types';
-import { Search, Plus, MessageSquare, ChevronDown, ChevronRight } from 'lucide-react';
+import { Search, Plus, MessageSquare, ChevronDown, ChevronRight, Trash2, Filter } from 'lucide-react';
 import {
     subscribeToCards,
     subscribeToMessages,
@@ -21,14 +20,16 @@ import {
     addMessage,
     updateMonthlyCardData,
     auditLog,
-    deleteCard
+    deleteCard,
+    deleteMessage
 } from '../lib/firestoreService';
 import type { Message } from '../lib/firestoreService';
 
-// --- Local constants replaced by Firebase ---
+// --- Local constants ---
 const TEAMS: Team[] = ['Pré Assigment', 'Jeppesen', 'CAE'];
+const EQUIPMENTS: EquipmentGroup[] = ['A320', 'A330', 'ATR', 'ERJ', 'Cmros'];
 
-// Configuração de cores por equipe (Tons de Azul Modernos/Energéticos)
+// Configuração de cores por equipe
 const TEAM_CONFIG: Record<Team, {
     headerBg: string;
     progressColor: string;
@@ -57,7 +58,7 @@ const TEAM_CONFIG: Record<Team, {
 
 export default function Board() {
     const {
-        searchQuery, setSearchQuery, statusFilter, teamFilter, equipmentFilter,
+        searchQuery, setSearchQuery, statusFilter, teamFilter, equipmentFilter, setEquipmentFilter,
         selectedMonth
     } = useFilterStore();
 
@@ -72,11 +73,6 @@ export default function Board() {
         'Jeppesen': true,
         'CAE': true
     });
-
-    const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-    );
 
     // --- Subscriptions ---
     useEffect(() => {
@@ -170,8 +166,16 @@ export default function Board() {
     };
 
     const handleDeleteCard = async (id: string) => {
-        await deleteCard(id);
-        closeModal();
+        if (window.confirm('Tem certeza que deseja excluir esta atividade?')) {
+            await deleteCard(id);
+            closeModal();
+        }
+    };
+
+    const handleDeleteMessage = async (id: string) => {
+        if (window.confirm('Excluir este aviso para todos?')) {
+            await deleteMessage(id);
+        }
     };
 
     const handleSendMessage = async (text: string) => {
@@ -184,12 +188,6 @@ export default function Board() {
         });
     };
 
-    // --- Drag & Drop ---
-    const handleDragOver = (event: DragOverEvent) => {
-        const { over } = event;
-        if (!over) return;
-    };
-
     const handleDragEnd = async (event: DragEndEvent) => {
         const { active, over } = event;
         if (!over) return;
@@ -197,7 +195,6 @@ export default function Board() {
         const activeCard = cards.find(c => c.id === active.id);
         const overId = over.id as string;
 
-        // If dropped on a column, update team
         if (TEAMS.includes(overId as Team)) {
             if (activeCard && activeCard.team !== overId) {
                 await upsertCard({ ...activeCard, team: overId as Team });
@@ -216,15 +213,15 @@ export default function Board() {
         setExpandedTeams(prev => ({ ...prev, [team]: !prev[team] }));
     };
 
+    const isAdmin = currentUser?.role === 'admin';
+
     return (
-        <div className="flex flex-col h-[calc(100vh-72px)] overflow-hidden bg-slate-50 pt-6">
+        <div className="flex flex-col h-[calc(100vh-72px)] overflow-hidden bg-slate-50">
+            {/* Gráficos Reintroduzidos */}
+            <Dashboards cards={mergedCards} />
+
             <div className="flex flex-1 overflow-x-auto gap-8 px-8 pb-10 scrollbar-hide">
-                <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCorners}
-                    onDragOver={handleDragOver}
-                    onDragEnd={handleDragEnd}
-                >
+                <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
                     {TEAMS.map(team => {
                         const teamCards = filteredCards.filter(c => c.team === team);
                         const total = teamCards.length;
@@ -234,14 +231,10 @@ export default function Board() {
                         const config = TEAM_CONFIG[team];
 
                         return (
-                            <div key={team} className={`flex flex-col h-fit transition-all duration-500 ease-in-out ${isExpanded ? 'min-w-[360px] flex-1' : 'min-w-[80px] w-[80px]'}`}>
-                                {/* Header da Categoria */}
+                            <div key={team} className={`flex flex-col h-fit transition-all duration-500 ease-in-out ${isExpanded ? 'min-w-[380px] flex-1' : 'min-w-[80px] w-[80px]'}`}>
                                 <button
                                     onClick={() => toggleTeam(team)}
-                                    className={`
-                                        relative overflow-hidden flex items-center h-14 mb-4 rounded-2xl transition-all duration-300 group
-                                        ${isExpanded ? `${config.headerBg} shadow-lg shadow-blue-500/10` : `bg-white border border-slate-200 hover:border-slate-300`}
-                                    `}
+                                    className={`relative overflow-hidden flex items-center h-14 mb-4 rounded-2xl transition-all duration-300 ${isExpanded ? `${config.headerBg} shadow-lg shadow-blue-500/10` : `bg-white border border-slate-200`}`}
                                 >
                                     {isExpanded ? (
                                         <div className="flex items-center justify-between w-full px-5 text-white">
@@ -266,48 +259,27 @@ export default function Board() {
                                     )}
                                 </button>
 
-                                {/* Área de Atividades (Cinza Claro) */}
-                                <div className={`
-                                    ${isExpanded ? `${config.lightBg} border border-slate-100 p-4 rounded-[2rem] min-h-[500px] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]` : 'opacity-0 h-0 pointer-events-none'}
-                                    transition-all duration-300
-                                `}>
+                                <div className={`${isExpanded ? `${config.lightBg} border border-slate-100 p-4 rounded-[2rem] min-h-[500px] shadow-sm` : 'opacity-0 h-0 pointer-events-none'}`}>
                                     <div className="flex flex-col gap-6">
-                                        {/* Agrupamento por Equipamento */}
                                         {Array.from(new Set(teamCards.map(c => c.equipment))).sort().map(equip => (
                                             <div key={equip} className="space-y-3">
                                                 <div className="flex items-center justify-between px-2">
                                                     <div className="flex items-center gap-2">
                                                         <div className={`w-1 h-4 rounded-full ${config.progressColor}`} />
-                                                        <h3 className={`text-[11px] font-black uppercase tracking-widest ${config.accentText}`}>
-                                                            {equip}
-                                                        </h3>
+                                                        <h3 className={`text-[11px] font-black uppercase tracking-widest ${config.accentText}`}>{equip}</h3>
                                                     </div>
-                                                    <span className="text-[10px] font-black text-slate-300">
-                                                        {teamCards.filter(c => c.equipment === equip).length} ITENS
-                                                    </span>
                                                 </div>
-
                                                 <KanbanColumn id={`${team}-${equip}`} team={team} cards={teamCards.filter(c => c.equipment === equip)}>
                                                     <div className="flex flex-col gap-3">
                                                         {teamCards.filter(c => c.equipment === equip).map(card => (
-                                                            <SortableCardItem
-                                                                key={card.id}
-                                                                card={card}
-                                                                openEditCard={openEditCard}
-                                                                onToggleStatus={handleToggleStatus}
-                                                                onToggleSubTask={handleToggleSubTask}
-                                                            />
+                                                            <SortableCardItem key={card.id} card={card} openEditCard={openEditCard} onToggleStatus={handleToggleStatus} onToggleSubTask={handleToggleSubTask} />
                                                         ))}
                                                     </div>
                                                 </KanbanColumn>
                                             </div>
                                         ))}
-
-                                        <button
-                                            onClick={openNewCard}
-                                            className="mt-2 w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:text-blue-500 hover:border-blue-200 hover:bg-blue-50/30 transition-all flex flex-col items-center justify-center gap-1 group"
-                                        >
-                                            <Plus size={20} className="group-hover:scale-110 transition-transform" />
+                                        <button onClick={openNewCard} className="mt-2 w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:text-blue-500 hover:border-blue-200 hover:bg-white transition-all flex flex-col items-center justify-center gap-1 group">
+                                            <Plus size={20} className="group-hover:scale-110" />
                                             <span className="text-[10px] font-black uppercase tracking-widest">Novo Item</span>
                                         </button>
                                     </div>
@@ -317,75 +289,93 @@ export default function Board() {
                     })}
                 </DndContext>
 
-                {/* Mural de Recados */}
+                {/* Mural de Recados com Deletar para Admins */}
                 <div className="min-w-[320px] bg-white border border-slate-200 rounded-[2.5rem] shadow-xl flex flex-col overflow-hidden mb-4">
-                    <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                    <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-600 rounded-xl shadow-lg shadow-blue-500/20 text-white">
-                                <MessageSquare size={18} />
-                            </div>
+                            <div className="p-2 bg-blue-600 rounded-xl shadow-lg shadow-blue-500/10 text-white"><MessageSquare size={18} /></div>
                             <span className="font-black text-sm uppercase tracking-widest text-slate-800">Mural Mensal</span>
                         </div>
-                        <div className="px-3 py-1 bg-white border border-slate-200 rounded-full">
-                            <span className="text-[9px] font-black text-blue-600 uppercase">{selectedMonth}</span>
-                        </div>
                     </div>
-
                     <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 scrollbar-hide">
                         {messages.length === 0 ? (
                             <div className="flex-1 flex flex-col items-center justify-center text-slate-300 italic py-20 text-center">
-                                <MessageSquare size={40} strokeWidth={1} className="mb-2 opacity-20" />
-                                <p className="text-xs font-bold uppercase tracking-widest opacity-40">Sem avisos este mês</p>
+                                <MessageSquare size={40} className="mb-2 opacity-10" />
+                                <p className="text-xs font-bold uppercase tracking-widest opacity-40">Sem avisos</p>
                             </div>
                         ) : (
                             messages.map((msg) => (
-                                <div key={msg.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col gap-2">
-                                    <p className="text-sm font-medium text-slate-700 leading-relaxed">{msg.text}</p>
-                                    <div className="flex items-center justify-between mt-1">
-                                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-wider">{msg.userName}</span>
+                                <div key={msg.id} className="relative bg-slate-50 p-4 rounded-2xl border border-slate-100 group/msg">
+                                    <p className="text-sm font-medium text-slate-700 leading-relaxed pr-6">{msg.text}</p>
+                                    <div className="flex items-center justify-between mt-2">
+                                        <span className="text-[10px] font-black text-blue-600 uppercase">{msg.userName}</span>
                                         <span className="text-[9px] font-bold text-slate-300">{new Date(msg.createdAt).toLocaleDateString()}</span>
                                     </div>
+                                    {isAdmin && (
+                                        <button
+                                            onClick={() => handleDeleteMessage(msg.id)}
+                                            className="absolute top-3 right-3 p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover/msg:opacity-100 transition-all rounded-lg"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    )}
                                 </div>
                             ))
                         )}
                     </div>
-
-                    <div className="p-6 bg-slate-50/50 border-t border-slate-100">
-                        <div className="relative">
-                            <input
-                                type="text"
-                                placeholder="Postar no mural..."
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        handleSendMessage((e.target as HTMLInputElement).value);
-                                        (e.target as HTMLInputElement).value = '';
-                                    }
-                                }}
-                                className="w-full bg-white border border-slate-200 rounded-2xl py-3 pl-4 pr-12 text-sm font-bold placeholder:text-slate-300 focus:border-blue-400 focus:ring-4 focus:ring-blue-50 transition-all"
-                            />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-300 uppercase">
-                                Enter
-                            </div>
-                        </div>
+                    <div className="p-6 bg-slate-50 border-t border-slate-100">
+                        <input
+                            type="text"
+                            placeholder="Postar no mural..."
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleSendMessage((e.target as HTMLInputElement).value);
+                                    (e.target as HTMLInputElement).value = '';
+                                }
+                            }}
+                            className="w-full bg-white border border-slate-200 rounded-2xl py-3 px-4 text-sm font-bold focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                        />
                     </div>
                 </div>
             </div>
 
-            {/* Barra de Busca Flutuante */}
-            <div className="fixed bottom-10 left-1/2 -translate-x-1/2 h-14 bg-slate-900 shadow-2xl shadow-black/20 px-4 rounded-2xl flex items-center gap-4 border border-white/10 z-[100] backdrop-blur-md">
-                <div className="flex items-center gap-3 h-full pr-4 border-r border-white/10">
+            {/* Barra de Busca e Filtro de Equipamento (WELL VISIBLE) */}
+            <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900 shadow-2xl px-6 py-2 rounded-2xl flex items-center gap-6 border border-white/10 z-[100] backdrop-blur-md">
+                {/* Search */}
+                <div className="flex items-center gap-3 border-r border-white/10 pr-6">
                     <Search size={18} className="text-slate-400" />
                     <input
                         type="text"
-                        placeholder="Buscar atividade..."
+                        placeholder="Buscar..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="bg-transparent text-white text-sm font-bold placeholder:text-slate-500 border-none focus:ring-0 min-w-[200px]"
+                        className="bg-transparent text-white text-sm font-bold placeholder:text-slate-600 border-none focus:ring-0 w-32 focus:w-48 transition-all"
                     />
                 </div>
+
+                {/* Equipment Filter Pills */}
                 <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-[10px] font-black text-slate-400">⌘</div>
-                    <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-[10px] font-black text-slate-400">F</div>
+                    <div className="flex items-center gap-2 text-white/40 mr-2 border-r border-white/5 pr-4">
+                        <Filter size={14} />
+                        <span className="text-[10px] font-black uppercase tracking-tighter">Equipamento</span>
+                    </div>
+                    <div className="flex gap-1.5">
+                        <button
+                            onClick={() => setEquipmentFilter('Todos')}
+                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${equipmentFilter === 'Todos' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/40' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+                        >
+                            Todos
+                        </button>
+                        {EQUIPMENTS.map(eq => (
+                            <button
+                                key={eq}
+                                onClick={() => setEquipmentFilter(eq)}
+                                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${equipmentFilter === eq ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/40' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+                            >
+                                {eq}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 

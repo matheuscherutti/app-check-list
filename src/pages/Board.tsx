@@ -106,6 +106,8 @@ export default function Board() {
                 let title = card.title;
                 let team = card.team;
                 let equipment = card.equipment;
+                let subTasksDefinition = card.subTasks || [];
+                let isMultiTask = card.isMultiTask || false;
 
                 const previousMonthsWithOverrides = allMonths.filter(m => m <= selectedMonth).reverse();
                 for (const m of previousMonthsWithOverrides) {
@@ -114,18 +116,20 @@ export default function Board() {
                         if (override.title) title = override.title;
                         if (override.team) team = override.team;
                         if (override.equipment) equipment = override.equipment;
+                        if (override.subTasks) subTasksDefinition = override.subTasks;
+                        if (override.isMultiTask !== undefined) isMultiTask = override.isMultiTask;
                         break;
                     }
                 }
 
                 const monthInfo = (monthlyData[selectedMonth] && monthlyData[selectedMonth][card.id]) || {};
 
-                const subTasks = card.subTasks?.map(st => ({
+                const subTasks = subTasksDefinition.map(st => ({
                     ...st,
                     status: (monthInfo.subTasksStatuses && monthInfo.subTasksStatuses[st.id]) || st.status
                 })) || [];
 
-                const isActuallyCompleted = card.isMultiTask
+                const isActuallyCompleted = isMultiTask
                     ? (subTasks.length > 0 && subTasks.every(st => st.status === 'Concluído'))
                     : (monthInfo.status || card.status) === 'Concluído';
 
@@ -197,29 +201,37 @@ export default function Board() {
 
     const handleSaveCard = async (data: Partial<Card>) => {
         if (editingCard) {
-            const hasChanges = (data.title && data.title !== editingCard.title) ||
+            const subTasksChanged = JSON.stringify(data.subTasks || []) !== JSON.stringify(editingCard.subTasks || []);
+
+            const hasStructuralChanges = (data.title && data.title !== editingCard.title) ||
                 (data.team && data.team !== editingCard.team) ||
-                (data.equipment && data.equipment !== editingCard.equipment);
+                (data.equipment && data.equipment !== editingCard.equipment) ||
+                (data.isMultiTask !== undefined && data.isMultiTask !== editingCard.isMultiTask) ||
+                subTasksChanged;
 
-            if (hasChanges) {
-                await updateMonthlyCardData(selectedMonth, editingCard.id, {
-                    overrides: {
-                        title: data.title,
-                        team: data.team,
-                        equipment: data.equipment
-                    }
-                });
+            const updateData: any = {
+                notes: data.notes || ''
+            };
 
+            if (hasStructuralChanges) {
+                updateData.overrides = {
+                    title: data.title,
+                    team: data.team,
+                    equipment: data.equipment,
+                    isMultiTask: data.isMultiTask,
+                    subTasks: data.subTasks
+                };
+            }
+
+            await updateMonthlyCardData(selectedMonth, editingCard.id, updateData);
+
+            if (hasStructuralChanges) {
                 await auditLog({
                     user: currentUser?.name || 'Desconhecido',
                     action: 'Editou',
                     target: data.title || editingCard.title,
-                    details: `Alterou propriedades globais no mês ${selectedMonth}. Mudança afeta este mês e futuros.`,
+                    details: `Alterou propriedades no mês ${selectedMonth}.`,
                     timestamp: Date.now()
-                });
-            } else {
-                await updateMonthlyCardData(selectedMonth, editingCard.id, {
-                    notes: data.notes
                 });
             }
         } else {

@@ -95,7 +95,14 @@ export const subscribeToMonthlyData = (callback: (data: any) => void) => {
 
 export const updateMonthlyCardData = async (month: string, cardId: string, updates: any) => {
     const docRef = doc(db, MONTHLY_DATA_COLLECTION, month);
-    await setDoc(docRef, { [cardId]: updates }, { merge: true });
+
+    // Use dot notation to update specific fields within the card object to avoid overwriting the whole object
+    const finalUpdates: any = {};
+    Object.keys(updates).forEach(key => {
+        finalUpdates[`${cardId}.${key}`] = updates[key];
+    });
+
+    await setDoc(docRef, finalUpdates, { merge: true });
 };
 
 // --- USERS (Equipe) ---

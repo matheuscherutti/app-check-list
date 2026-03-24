@@ -23,7 +23,8 @@ import {
     addMessage,
     deleteMessage
 } from '../lib/firestoreService';
-import type { Message } from '../lib/firestoreService';
+import { useWorkspaceStore } from '../stores/useWorkspaceStore';
+import type { Message } from '../types';
 
 // --- Local constants ---
 const TEAMS: Team[] = ['Pré Assigment', 'Jeppesen', 'CAE'];
@@ -64,6 +65,7 @@ export default function Board() {
 
     const { isOpen, editingCard, openEditCard, openNewCard, closeModal } = useModalStore();
     const { currentUser } = useUserStore();
+    const { activeWorkspaceId } = useWorkspaceStore();
 
     const [cards, setCards] = useState<Card[]>([]);
     const [messages, setMessages] = useState<Message[]>([]);
@@ -77,12 +79,12 @@ export default function Board() {
 
     // --- Subscriptions ---
     useEffect(() => {
-        const unsubCards = subscribeToCards((data) => {
+        const unsubCards = subscribeToCards(activeWorkspaceId, (data) => {
             // Sort locally by order field
             const sortedData = [...data].sort((a, b) => (a.order || 0) - (b.order || 0));
             setCards(sortedData);
         });
-        const unsubMsg = subscribeToMessages(selectedMonth, (data) => setMessages(data));
+        const unsubMsg = subscribeToMessages(activeWorkspaceId, selectedMonth, (data) => setMessages(data));
         const unsubMonthly = subscribeToMonthlyData((data) => setMonthlyData(data));
 
         return () => {
@@ -90,7 +92,7 @@ export default function Board() {
             unsubMsg();
             unsubMonthly();
         };
-    }, [selectedMonth]);
+    }, [selectedMonth, activeWorkspaceId]);
 
     // Merge global card data with monthly overrides and versioning
     const mergedCards = useMemo(() => {
@@ -238,6 +240,7 @@ export default function Board() {
             const cardId = Math.random().toString(36).substr(2, 9);
             const newCard: Card = {
                 id: cardId,
+                workspaceId: activeWorkspaceId,
                 title: data.title || '',
                 equipment: (data.equipment || 'A320') as EquipmentGroup,
                 team: (data.team || 'Pré Assigment') as Team,
@@ -288,12 +291,7 @@ export default function Board() {
 
     const handleSendMessage = async (text: string) => {
         if (!text.trim() || !currentUser) return;
-        await addMessage({
-            text,
-            userName: currentUser.name,
-            month: selectedMonth,
-            createdAt: Date.now()
-        });
+        await addMessage(activeWorkspaceId, text, currentUser.name, selectedMonth);
     };
 
     const handleDragEnd = async (event: DragEndEvent) => {

@@ -8,8 +8,15 @@ export interface SubTask {
     status: Status;
 }
 
+export interface Workspace {
+    id: string;
+    name: string;
+    icon?: string;
+}
+
 export interface Card {
     id: string; // Used across months to identify the same logical card
+    workspaceId: string; // Linked to a specific workspace
     title: string;
     equipment: EquipmentGroup;
     team: Team;
@@ -33,6 +40,15 @@ export interface Comment {
     createdAt: number | Date;
 }
 
+export interface Message {
+    id: string;
+    workspaceId: string;
+    text: string;
+    userName: string;
+    month: string;
+    createdAt: number;
+}
+
 export interface AuditLog {
     id: string;
     user: string;
@@ -41,6 +57,7 @@ export interface AuditLog {
         targetMonth: string;
         equipment: string;
         team: string;
+        workspaceId?: string;
     };
     message: string;
     createdAt: number | Date;

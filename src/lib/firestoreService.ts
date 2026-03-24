@@ -10,15 +10,7 @@ import {
     orderBy
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
-import type { Card } from '../types';
-
-export interface Message {
-    id: string;
-    text: string;
-    userName: string;
-    month: string;
-    createdAt: number;
-}
+import type { Card, Message } from '../types';
 
 export interface AuditEntry {
     id: string;
@@ -37,11 +29,21 @@ const LOGS_COLLECTION = 'logs';
 
 // --- CARDS ---
 
-export const subscribeToCards = (callback: (cards: Card[]) => void) => {
+export const subscribeToCards = (workspaceId: string, callback: (cards: Card[]) => void) => {
+    // Queries all cards. We'll filter by workspaceId. 
+    // For legacy cards, we'll assume 'escalas' if missing.
     const q = query(collection(db, CARDS_COLLECTION));
     return onSnapshot(q, (snapshot) => {
-        const cards = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Card));
-        callback(cards);
+        const cards = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                ...data,
+                id: doc.id,
+                workspaceId: data.workspaceId || 'escalas' // Migration logic
+            } as Card;
+        });
+        const filteredCards = cards.filter(c => c.workspaceId === workspaceId);
+        callback(filteredCards);
     });
 };
 
@@ -56,22 +58,25 @@ export const deleteCard = async (cardId: string) => {
 
 // --- MESSAGES ---
 
-export const subscribeToMessages = (month: string, callback: (messages: Message[]) => void) => {
+export const subscribeToMessages = (workspaceId: string, month: string, callback: (messages: Message[]) => void) => {
     const q = query(
         collection(db, MESSAGES_COLLECTION),
-        where('month', '==', month)
+        where('month', '==', month),
+        where('workspaceId', '==', workspaceId),
+        orderBy('createdAt', 'desc')
     );
     return onSnapshot(q, (snapshot) => {
-        const messages = snapshot.docs
-            .map(doc => ({ ...doc.data(), id: doc.id } as Message))
-            .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+        const messages = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Message));
         callback(messages);
     });
 };
 
-export const addMessage = async (message: Omit<Message, 'id'>) => {
+export const addMessage = async (workspaceId: string, text: string, userName: string, month: string) => {
     await addDoc(collection(db, MESSAGES_COLLECTION), {
-        ...message,
+        workspaceId,
+        text,
+        userName,
+        month,
         createdAt: Date.now()
     });
 };

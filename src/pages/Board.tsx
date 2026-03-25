@@ -203,7 +203,8 @@ export default function Board() {
 
     const handleSaveCard = async (data: Partial<Card>) => {
         if (editingCard) {
-            const subTasksChanged = JSON.stringify(data.subTasks || []) !== JSON.stringify(editingCard.subTasks || []);
+            const subTasksChanged = (data.subTasks?.length !== editingCard.subTasks?.length) ||
+                (JSON.stringify(data.subTasks?.map(s => s.title)) !== JSON.stringify(editingCard.subTasks?.map(s => s.title)));
 
             const hasStructuralChanges = (data.title && data.title !== editingCard.title) ||
                 (data.team && data.team !== editingCard.team) ||
@@ -221,7 +222,11 @@ export default function Board() {
                     team: data.team,
                     equipment: data.equipment,
                     isMultiTask: data.isMultiTask,
-                    subTasks: data.subTasks
+                    subTasks: data.subTasks?.map(st => ({
+                        id: st.id,
+                        title: st.title,
+                        status: 'Pendente'
+                    }))
                 };
             }
 

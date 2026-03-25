@@ -142,10 +142,10 @@ export default function CardModal({ isOpen, onClose, card, onDelete, onSave }: C
                         </div>
                     </div>
 
-                    {!isEditing && (
-                        <div className="flex items-center gap-3 p-4 bg-primary-50/50 border border-primary-100 rounded-xl group cursor-pointer" onClick={() => setIsMultiTask(!isMultiTask)}>
-                            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isMultiTask ? 'bg-primary-600 border-primary-600' : 'bg-white border-slate-300'}`}>
-                                {isMultiTask && <Plus size={14} className="text-white" />}
+                    {!isMultiTask && (
+                        <div className="flex items-center gap-3 p-4 bg-primary-50/50 border border-primary-100 rounded-xl group cursor-pointer" onClick={() => setIsMultiTask(true)}>
+                            <div className="w-5 h-5 rounded border flex items-center justify-center transition-colors bg-white border-slate-300">
+                                <Plus size={14} className="text-slate-400" />
                             </div>
                             <span className="text-sm font-bold text-primary-900">
                                 Ativar Checklist (Multi-Tarefas)

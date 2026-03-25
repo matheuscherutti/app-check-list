@@ -34,9 +34,11 @@ export default function Layout() {
                 <div className="flex items-center gap-6 flex-1">
                     <div className="flex items-center gap-4">
                         <img src="/logo.jpg" alt="Logo" className="w-10 h-10 rounded-lg shadow-sm border border-slate-200" />
-                        <h1 className="text-xl font-bold text-slate-900 mr-2 whitespace-nowrap hidden lg:block tracking-tight">
-                            Central de Informações
-                        </h1>
+                        <div className="hidden lg:flex flex-col items-center bg-white px-5 py-1.5 rounded-2xl border border-slate-100 shadow-sm leading-[1.1] ml-2">
+                            <span className="text-[15px] font-black text-[#1e3a8a] uppercase tracking-tighter">Central de Controle</span>
+                            <div className="w-full h-[1.5px] bg-slate-100 my-1" />
+                            <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Monitoramento Geral</span>
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-8 pl-4 border-l border-slate-200">

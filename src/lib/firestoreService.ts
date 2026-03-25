@@ -66,7 +66,9 @@ export const subscribeToMessages = (workspaceId: string, month: string, callback
         orderBy('createdAt', 'desc')
     );
     return onSnapshot(q, (snapshot) => {
-        const messages = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Message));
+        const messages = snapshot.docs
+            .map(doc => ({ ...doc.data(), id: doc.id } as Message))
+            .filter(m => (m.workspaceId || 'escalas') === workspaceId); // Migration safeguard
         callback(messages);
     });
 };

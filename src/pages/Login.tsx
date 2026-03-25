@@ -34,13 +34,16 @@ export default function Login() {
             <div className="sm:mx-auto sm:w-full sm:max-w-md flex flex-col items-center">
                 <img
                     src="/logo.jpg"
-                    alt="Logo Planejamento de Aeronautas"
+                    alt="Logo Central de Controle"
                     className="w-48 h-auto mb-6 rounded-2xl shadow-xl border border-white/50"
                 />
                 <h2 className="text-center text-3xl font-extrabold text-slate-900 tracking-tight">
-                    Check List Aeronautas
+                    Central de Controle
                 </h2>
-                <p className="mt-2 text-center text-sm text-slate-600 font-medium bg-slate-100 px-4 py-1 rounded-full border border-slate-200">
+                <h3 className="text-center text-lg font-bold text-blue-600 uppercase tracking-widest mt-1">
+                    Monitoramento Geral
+                </h3>
+                <p className="mt-4 text-center text-sm text-slate-600 font-medium bg-slate-100 px-4 py-1 rounded-full border border-slate-200">
                     Selecione seu nome para entrar. Não é necessária senha.
                 </p>
             </div>

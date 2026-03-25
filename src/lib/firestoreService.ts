@@ -7,7 +7,8 @@ import {
     deleteDoc,
     addDoc,
     where,
-    orderBy
+    orderBy,
+    updateDoc
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import type { Card, Message } from '../types';
@@ -103,13 +104,25 @@ export const subscribeToMonthlyData = (callback: (data: any) => void) => {
 export const updateMonthlyCardData = async (month: string, cardId: string, updates: any) => {
     const docRef = doc(db, MONTHLY_DATA_COLLECTION, month);
 
-    // Use dot notation to update specific fields within the card object to avoid overwriting the whole object
-    const finalUpdates: any = {};
+    // Prepare dot notation updates for updateDoc
+    const dotUpdates: any = {};
     Object.keys(updates).forEach(key => {
-        finalUpdates[`${cardId}.${key}`] = updates[key];
+        dotUpdates[`${cardId}.${key}`] = updates[key];
     });
 
-    await setDoc(docRef, finalUpdates, { merge: true });
+    try {
+        // Try updateDoc first (handles nested updates efficiently)
+        await updateDoc(docRef, dotUpdates);
+    } catch (e: any) {
+        // If document doesn't exist, create it with setDoc using NESTED object structure
+        if (e.code === 'not-found') {
+            await setDoc(docRef, { [cardId]: updates }, { merge: true });
+        } else {
+            console.error("Error updating monthly data:", e);
+            // Fallback for any other error: use setDoc with proper nested structure
+            await setDoc(docRef, { [cardId]: updates }, { merge: true });
+        }
+    }
 };
 
 // --- USERS (Equipe) ---

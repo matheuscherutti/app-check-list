@@ -22,7 +22,7 @@ export default function Topbar() {
             </div>
 
             <button
-                onClick={openNewCard}
+                onClick={() => openNewCard()}
                 className="bg-primary-600 hover:bg-primary-700 text-white p-2 rounded-xl shadow-lg shadow-primary-600/20 active:scale-95 transition-all outline-none"
                 title="Novo Cartão"
             >

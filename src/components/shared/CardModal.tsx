@@ -5,20 +5,27 @@ import type { Card, EquipmentGroup, Team, SubTask } from '../../types';
 interface CardModalProps {
     isOpen: boolean;
     onClose: () => void;
-    card?: Card;
+    card?: Card | Partial<Card>;
     onDelete?: (id: string) => void;
     onSave: (data: Partial<Card>) => void;
+    availableEquipments?: string[];
+    availableTeams?: string[];
 }
 
-const GROUPS: EquipmentGroup[] = ['A320', 'A330', 'ATR', 'ERJ', 'Cmros'];
-const TEAMS: Team[] = ['Pré Assigment', 'Jeppesen', 'CAE'];
-
-export default function CardModal({ isOpen, onClose, card, onDelete, onSave }: CardModalProps) {
-    const isEditing = !!card;
+export default function CardModal({
+    isOpen,
+    onClose,
+    card,
+    onDelete,
+    onSave,
+    availableEquipments = [],
+    availableTeams = []
+}: CardModalProps) {
+    const isEditing = !!(card as Card)?.id;
 
     const [title, setTitle] = useState('');
-    const [equipment, setEquipment] = useState<EquipmentGroup>('A320');
-    const [team, setTeam] = useState<Team>('Pré Assigment');
+    const [equipment, setEquipment] = useState<EquipmentGroup>(availableEquipments[0] || '');
+    const [team, setTeam] = useState<Team>(availableTeams[0] || '');
 
     // Multi task state
     const [isMultiTask, setIsMultiTask] = useState(false);
@@ -31,22 +38,22 @@ export default function CardModal({ isOpen, onClose, card, onDelete, onSave }: C
     useEffect(() => {
         if (isOpen) {
             if (card) {
-                setTitle(card.title);
-                setEquipment(card.equipment);
-                setTeam(card.team);
+                setTitle(card.title || '');
+                setEquipment(card.equipment || availableEquipments[0] || '');
+                setTeam(card.team || availableTeams[0] || '');
                 setIsMultiTask(card.isMultiTask || false);
                 setSubTasks(card.subTasks || []);
                 setNotes(card.notes || '');
             } else {
                 setTitle('');
-                setEquipment('A320');
-                setTeam('Pré Assigment');
+                setEquipment(availableEquipments[0] || '');
+                setTeam(availableTeams[0] || '');
                 setIsMultiTask(false);
                 setSubTasks([]);
                 setNotes('');
             }
         }
-    }, [isOpen, card]);
+    }, [isOpen, card, availableEquipments, availableTeams]);
 
     if (!isOpen) return null;
 
@@ -65,9 +72,9 @@ export default function CardModal({ isOpen, onClose, card, onDelete, onSave }: C
     };
 
     const handleConfirmDelete = () => {
-        if (card && onDelete) {
+        if (card && 'id' in card && onDelete) {
             if (window.confirm('Tem certeza que deseja excluir permanentemente este card?')) {
-                onDelete(card.id);
+                onDelete(card.id as string);
             }
         }
     };
@@ -94,7 +101,7 @@ export default function CardModal({ isOpen, onClose, card, onDelete, onSave }: C
                         <h2 className="text-xl font-black text-slate-800 tracking-tight">
                             {isEditing ? 'Detalhes da Atividade' : 'Nova Atividade'}
                         </h2>
-                        {isEditing && (
+                        {isEditing && card && 'id' in card && (
                             <p className="text-xs font-bold text-slate-400 mt-0.5 uppercase tracking-wider">ID: {card.id}</p>
                         )}
                     </div>
@@ -121,23 +128,43 @@ export default function CardModal({ isOpen, onClose, card, onDelete, onSave }: C
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Equipamento</label>
-                                <select
-                                    value={equipment}
-                                    onChange={(e) => setEquipment(e.target.value as EquipmentGroup)}
-                                    className="w-full border-slate-200 rounded-xl p-3 text-sm font-bold bg-slate-50"
-                                >
-                                    {GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
-                                </select>
+                                {availableEquipments.length > 0 ? (
+                                    <select
+                                        value={equipment}
+                                        onChange={(e) => setEquipment(e.target.value)}
+                                        className="w-full border-slate-200 rounded-xl p-3 text-sm font-bold bg-slate-50"
+                                    >
+                                        {availableEquipments.map(g => <option key={g} value={g}>{g}</option>)}
+                                    </select>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={equipment}
+                                        onChange={(e) => setEquipment(e.target.value)}
+                                        className="w-full border-slate-200 rounded-xl p-3 text-sm font-bold focus:ring-primary-500"
+                                        placeholder="Defina o equipamento..."
+                                    />
+                                )}
                             </div>
                             <div>
                                 <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Setor</label>
-                                <select
-                                    value={team}
-                                    onChange={(e) => setTeam(e.target.value as Team)}
-                                    className="w-full border-slate-200 rounded-xl p-3 text-sm font-bold"
-                                >
-                                    {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
-                                </select>
+                                {availableTeams.length > 0 ? (
+                                    <select
+                                        value={team}
+                                        onChange={(e) => setTeam(e.target.value)}
+                                        className="w-full border-slate-200 rounded-xl p-3 text-sm font-bold"
+                                    >
+                                        {availableTeams.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={team}
+                                        onChange={(e) => setTeam(e.target.value)}
+                                        className="w-full border-slate-200 rounded-xl p-3 text-sm font-bold focus:ring-primary-500"
+                                        placeholder="Defina o setor..."
+                                    />
+                                )}
                             </div>
                         </div>
                     </div>

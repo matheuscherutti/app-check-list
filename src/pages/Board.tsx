@@ -12,6 +12,7 @@ import {
 import { arrayMove } from '@dnd-kit/sortable';
 import type { DragEndEvent } from '@dnd-kit/core';
 import type { Card, EquipmentGroup, Team, Status } from '../types';
+import confetti from 'canvas-confetti';
 import { Search, Plus, MessageSquare, ChevronDown, ChevronRight, Trash2, Filter, ChevronLeft } from 'lucide-react';
 import {
     subscribeToCards,
@@ -27,34 +28,19 @@ import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import type { Message } from '../types';
 
 // --- Local constants ---
-const TEAMS: Team[] = ['Pré Assigment', 'Jeppesen', 'CAE'];
-const EQUIPMENTS: EquipmentGroup[] = ['A320', 'A330', 'ATR', 'ERJ', 'Cmros'];
+// Configuração de cores por equipe (Default fallback patterns)
+const TEAM_CONFIG_BASE = [
+    { headerBg: 'bg-indigo-600', progressColor: 'bg-indigo-600', lightBg: 'bg-slate-50/80', accentText: 'text-indigo-600' },
+    { headerBg: 'bg-blue-600', progressColor: 'bg-blue-600', lightBg: 'bg-slate-50/80', accentText: 'text-blue-600' },
+    { headerBg: 'bg-cyan-600', progressColor: 'bg-cyan-600', lightBg: 'bg-slate-50/80', accentText: 'text-cyan-600' },
+    { headerBg: 'bg-emerald-600', progressColor: 'bg-emerald-600', lightBg: 'bg-slate-50/80', accentText: 'text-emerald-600' },
+    { headerBg: 'bg-violet-600', progressColor: 'bg-violet-600', lightBg: 'bg-slate-50/80', accentText: 'text-violet-600' },
+];
 
-// Configuração de cores por equipe
-const TEAM_CONFIG: Record<Team, {
-    headerBg: string;
-    progressColor: string;
-    lightBg: string;
-    accentText: string;
-}> = {
-    'Pré Assigment': {
-        headerBg: 'bg-indigo-600',
-        progressColor: 'bg-indigo-600',
-        lightBg: 'bg-slate-50/80',
-        accentText: 'text-indigo-600'
-    },
-    'Jeppesen': {
-        headerBg: 'bg-blue-600',
-        progressColor: 'bg-blue-600',
-        lightBg: 'bg-slate-50/80',
-        accentText: 'text-blue-600'
-    },
-    'CAE': {
-        headerBg: 'bg-cyan-600',
-        progressColor: 'bg-cyan-600',
-        lightBg: 'bg-slate-50/80',
-        accentText: 'text-cyan-600'
-    }
+const getTeamConfig = (teamName: string, teams: string[]) => {
+    const index = teams.indexOf(teamName);
+    if (index === -1) return TEAM_CONFIG_BASE[0];
+    return TEAM_CONFIG_BASE[index % TEAM_CONFIG_BASE.length];
 };
 
 export default function Board() {
@@ -65,17 +51,27 @@ export default function Board() {
 
     const { isOpen, editingCard, openEditCard, openNewCard, closeModal } = useModalStore();
     const { currentUser } = useUserStore();
-    const { activeWorkspaceId } = useWorkspaceStore();
+    const { getActiveWorkspace, activeWorkspaceId } = useWorkspaceStore();
+    const activeWorkspace = getActiveWorkspace();
+    const AVAILABLE_SECTORS = activeWorkspace?.sectors || [];
+    const AVAILABLE_TEAMS = activeWorkspace?.teams || [];
+
+    const displayedSectors = useMemo(() => {
+        if (equipmentFilter === 'Todos') return AVAILABLE_SECTORS;
+        return AVAILABLE_SECTORS.filter(s => s === equipmentFilter);
+    }, [AVAILABLE_SECTORS, equipmentFilter]);
 
     const [cards, setCards] = useState<Card[]>([]);
     const [messages, setMessages] = useState<Message[]>([]);
     const [monthlyData, setMonthlyData] = useState<Record<string, any>>({});
     const [isMuralExpanded, setIsMuralExpanded] = useState(true);
-    const [expandedTeams, setExpandedTeams] = useState<Record<string, boolean>>({
-        'Pré Assigment': true,
-        'Jeppesen': true,
-        'CAE': true
-    });
+    const [expandedTeams, setExpandedTeams] = useState<Record<string, boolean>>({});
+
+    useEffect(() => {
+        const initial: Record<string, boolean> = {};
+        AVAILABLE_TEAMS.forEach(t => { initial[t] = true; });
+        setExpandedTeams(prev => ({ ...initial, ...prev }));
+    }, [AVAILABLE_TEAMS, activeWorkspaceId]);
 
     // --- Subscriptions ---
     useEffect(() => {
@@ -179,6 +175,15 @@ export default function Board() {
             details: `Status alterado para ${newStatus} no mês ${selectedMonth}`,
             timestamp: Date.now()
         });
+
+        if (newStatus === 'Concluído') {
+            confetti({
+                particleCount: 150,
+                spread: 70,
+                origin: { y: 0.6 },
+                colors: ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
+            });
+        }
     };
 
     const handleToggleSubTask = async (cardId: string, subTaskId: string, currentStatus: string) => {
@@ -191,6 +196,38 @@ export default function Board() {
         subTasksStatuses[subTaskId] = newStatus;
 
         await updateMonthlyCardData(selectedMonth, cardId, { subTasksStatuses });
+
+        if (newStatus === 'Concluído') {
+            // Check if ALL subtasks are now completed
+            const dbCard = cards.find(c => c.id === cardId) || card;
+            const updatedMonthly = (monthlyData[selectedMonth] && monthlyData[selectedMonth][cardId]) || {};
+            const finalSubTasksStatuses = { ...(updatedMonthly.subTasksStatuses || {}), [subTaskId]: newStatus };
+
+            const totalSubTasks = dbCard.subTasks?.length || 0;
+            const completedSubTasks = dbCard.subTasks?.filter(st => {
+                const mst = finalSubTasksStatuses[st.id];
+                return mst !== undefined ? mst === 'Concluído' : st.status === 'Concluído';
+            }).length || 0;
+
+            if (totalSubTasks > 0 && completedSubTasks === totalSubTasks) {
+                // ALL subtasks completed, big confetti!
+                confetti({
+                    particleCount: 200,
+                    spread: 100,
+                    origin: { y: 0.6 },
+                    colors: ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
+                    zIndex: 9999
+                });
+            } else {
+                // Small confetti for single subtask
+                confetti({
+                    particleCount: 50,
+                    spread: 40,
+                    origin: { y: 0.7 },
+                    zIndex: 9999
+                });
+            }
+        }
     };
 
     const upsertCard = async (card: Card) => {
@@ -202,7 +239,7 @@ export default function Board() {
     };
 
     const handleSaveCard = async (data: Partial<Card>) => {
-        if (editingCard) {
+        if (editingCard && 'id' in editingCard) {
             const subTasksChanged = (data.subTasks?.length !== editingCard.subTasks?.length) ||
                 (JSON.stringify(data.subTasks?.map(s => s.title)) !== JSON.stringify(editingCard.subTasks?.map(s => s.title)));
 
@@ -230,25 +267,28 @@ export default function Board() {
                 };
             }
 
-            await updateMonthlyCardData(selectedMonth, editingCard.id, updateData);
+            if (editingCard?.id) {
+                await updateMonthlyCardData(selectedMonth, editingCard.id, updateData);
 
-            if (hasStructuralChanges) {
-                await auditLog({
-                    user: currentUser?.name || 'Desconhecido',
-                    action: 'Editou',
-                    target: data.title || editingCard.title,
-                    details: `Alterou propriedades no mês ${selectedMonth}.`,
-                    timestamp: Date.now()
-                });
+                if (hasStructuralChanges) {
+                    await auditLog({
+                        user: currentUser?.name || 'Desconhecido',
+                        action: 'Editou',
+                        target: data.title || editingCard.title || 'Atividade',
+                        details: `Alterou propriedades no mês ${selectedMonth}.`,
+                        timestamp: Date.now()
+                    });
+                }
             }
         } else {
+            if (!activeWorkspaceId) return;
             const cardId = Math.random().toString(36).substr(2, 9);
             const newCard: Card = {
                 id: cardId,
-                workspaceId: activeWorkspaceId,
+                workspaceId: activeWorkspaceId as string,
                 title: data.title || '',
-                equipment: (data.equipment || 'A320') as EquipmentGroup,
-                team: (data.team || 'Pré Assigment') as Team,
+                equipment: (data.equipment || (AVAILABLE_SECTORS[0] || 'Setor')) as EquipmentGroup,
+                team: (data.team || (AVAILABLE_TEAMS[0] || 'Time')) as Team,
                 status: 'Pendente',
                 order: cards.length,
                 isMultiTask: data.isMultiTask || false,
@@ -296,7 +336,29 @@ export default function Board() {
 
     const handleSendMessage = async (text: string) => {
         if (!text.trim() || !currentUser) return;
-        await addMessage(activeWorkspaceId, text, currentUser.name, selectedMonth);
+
+        // Optimistic Update
+        const tempId = Math.random().toString(36).substring(7);
+        const newMessage: Message = {
+            id: tempId,
+            text: text.trim(),
+            userName: currentUser.name,
+            createdAt: Date.now(),
+            workspaceId: activeWorkspaceId,
+            month: selectedMonth
+        };
+
+        // Update local state immediately
+        setMessages(prev => [newMessage, ...prev]);
+
+        try {
+            await addMessage(activeWorkspaceId, text.trim(), currentUser.name, selectedMonth);
+        } catch (error) {
+            console.error("Failed to send message:", error);
+            // Revert optimistic update on error
+            setMessages(prev => prev.filter(m => m.id !== tempId));
+            alert("Erro ao enviar mensagem. Tente novamente.");
+        }
     };
 
     const handleDragEnd = async (event: DragEndEvent) => {
@@ -317,7 +379,7 @@ export default function Board() {
         // Case 1: Dragging over a Column container (id format: "Team-Equip")
         if (overId.includes('-')) {
             const [teamPart, equipPart] = overId.split('-');
-            if (TEAMS.includes(teamPart as Team)) {
+            if (AVAILABLE_TEAMS.includes(teamPart as Team)) {
                 targetTeam = teamPart as Team;
                 targetEquip = equipPart as EquipmentGroup;
             }
@@ -393,17 +455,21 @@ export default function Board() {
     return (
         <div className="flex flex-col h-[calc(100vh-72px)] overflow-hidden bg-slate-50">
             {/* Gráficos Reintroduzidos */}
-            <Dashboards cards={mergedCards} />
+            <Dashboards
+                cards={mergedCards}
+                sectors={AVAILABLE_SECTORS}
+                teams={AVAILABLE_TEAMS}
+            />
 
             <div className="flex flex-1 overflow-x-auto gap-8 px-8 pb-10 scrollbar-hide">
                 <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-                    {TEAMS.map(team => {
+                    {AVAILABLE_TEAMS.map(team => {
                         const teamCards = filteredCards.filter(c => c.team === team);
                         const total = teamCards.length;
                         const completed = teamCards.filter(c => c.status === 'Concluído').length;
                         const progress = total > 0 ? (completed / total) * 100 : 0;
                         const isExpanded = expandedTeams[team];
-                        const config = TEAM_CONFIG[team];
+                        const config = getTeamConfig(team, AVAILABLE_TEAMS);
 
                         return (
                             <div key={team} className={`flex flex-col h-fit transition-all duration-500 ease-in-out ${isExpanded ? 'min-w-[380px] flex-1' : 'min-w-[80px] w-[80px]'}`}>
@@ -435,29 +501,71 @@ export default function Board() {
                                 </button>
 
                                 <div className={`${isExpanded ? `${config.lightBg} border border-slate-100 p-4 rounded-[2rem] min-h-[500px] shadow-sm` : 'opacity-0 h-0 pointer-events-none'}`}>
-                                    <div className="flex flex-col gap-6">
-                                        {Array.from(new Set(teamCards.map(c => c.equipment))).sort().map(equip => (
-                                            <div key={equip} className="space-y-3">
-                                                <div className="flex items-center justify-between px-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className={`w-1 h-4 rounded-full ${config.progressColor}`} />
-                                                        <h3 className={`text-[11px] font-black uppercase tracking-widest ${config.accentText}`}>{equip}</h3>
+                                    <div className="flex flex-col gap-8">
+                                        {AVAILABLE_SECTORS.length > 0 ? (
+                                            displayedSectors.map(equip => {
+                                                const sectorCards = teamCards.filter(c => c.equipment === equip);
+                                                return (
+                                                    <div key={equip} className="space-y-4">
+                                                        <div className="flex items-center justify-between px-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className={`w-1 h-4 rounded-full ${config.progressColor}`} />
+                                                                <h3 className={`text-[11px] font-black uppercase tracking-widest ${config.accentText}`}>{equip}</h3>
+                                                            </div>
+                                                            <span className="text-[10px] font-bold text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-100">
+                                                                {sectorCards.length}
+                                                            </span>
+                                                        </div>
+
+                                                        <KanbanColumn id={`${team}-${equip}`} team={team} cards={sectorCards}>
+                                                            <div className="flex flex-col gap-3 min-h-[20px]">
+                                                                {sectorCards.map(card => (
+                                                                    <SortableCardItem
+                                                                        key={card.id}
+                                                                        card={card}
+                                                                        openEditCard={openEditCard}
+                                                                        onToggleStatus={handleToggleStatus}
+                                                                        onToggleSubTask={handleToggleSubTask}
+                                                                    />
+                                                                ))}
+                                                            </div>
+
+                                                            {/* Botão de Adicionar Contextual */}
+                                                            <button
+                                                                onClick={() => openNewCard({ team, equipment: equip })}
+                                                                className="mt-3 w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-300 hover:text-blue-500 hover:border-blue-200 hover:bg-white transition-all flex items-center justify-center gap-2 group"
+                                                            >
+                                                                <Plus size={16} className="group-hover:scale-110" />
+                                                                <span className="text-[10px] font-black uppercase tracking-widest">Novo Item no Setor</span>
+                                                            </button>
+                                                        </KanbanColumn>
                                                     </div>
-                                                </div>
-                                                <KanbanColumn id={`${team}-${equip}`} team={team} cards={teamCards.filter(c => c.equipment === equip)}>
-                                                    <div className="flex flex-col gap-3">
-                                                        {teamCards.filter(c => c.equipment === equip).map(card => (
-                                                            <SortableCardItem key={card.id} card={card} openEditCard={openEditCard} onToggleStatus={handleToggleStatus} onToggleSubTask={handleToggleSubTask} />
+                                                );
+                                            })
+                                        ) : (
+                                            <div className="space-y-4">
+                                                <KanbanColumn id={`${team}-Geral`} team={team} cards={teamCards}>
+                                                    <div className="flex flex-col gap-3 min-h-[20px]">
+                                                        {teamCards.map(card => (
+                                                            <SortableCardItem
+                                                                key={card.id}
+                                                                card={card}
+                                                                openEditCard={openEditCard}
+                                                                onToggleStatus={handleToggleStatus}
+                                                                onToggleSubTask={handleToggleSubTask}
+                                                            />
                                                         ))}
                                                     </div>
+                                                    <button
+                                                        onClick={() => openNewCard({ team, equipment: 'Geral' })}
+                                                        className="mt-3 w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-300 hover:text-blue-500 hover:border-blue-200 hover:bg-white transition-all flex items-center justify-center gap-2 group"
+                                                    >
+                                                        <Plus size={16} className="group-hover:scale-110" />
+                                                        <span className="text-[10px] font-black uppercase tracking-widest">Novo Item no Setor</span>
+                                                    </button>
                                                 </KanbanColumn>
                                             </div>
-                                        ))}
-                                        {/* Permissão para todos os usuários inserirem cards */}
-                                        <button onClick={openNewCard} className="mt-2 w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:text-blue-500 hover:border-blue-200 hover:bg-white transition-all flex flex-col items-center justify-center gap-1 group">
-                                            <Plus size={20} className="group-hover:scale-110" />
-                                            <span className="text-[10px] font-black uppercase tracking-widest">Novo Item</span>
-                                        </button>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -557,7 +665,7 @@ export default function Board() {
                         >
                             Todos
                         </button>
-                        {EQUIPMENTS.map(eq => (
+                        {AVAILABLE_SECTORS.map(eq => (
                             <button
                                 key={eq}
                                 onClick={() => setEquipmentFilter(eq)}
@@ -576,6 +684,8 @@ export default function Board() {
                 card={editingCard}
                 onSave={handleSaveCard}
                 onDelete={handleDeleteCard}
+                availableEquipments={AVAILABLE_SECTORS}
+                availableTeams={AVAILABLE_TEAMS}
             />
         </div>
     );

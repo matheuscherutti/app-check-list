@@ -11,7 +11,7 @@ import {
     updateDoc
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
-import type { Card, Message } from '../types';
+import type { Card, Message, Workspace } from '../types';
 
 export interface AuditEntry {
     id: string;
@@ -27,6 +27,34 @@ const MESSAGES_COLLECTION = 'messages';
 const MONTHLY_DATA_COLLECTION = 'monthlyData';
 const USERS_COLLECTION = 'users';
 const LOGS_COLLECTION = 'logs';
+const WORKSPACES_COLLECTION = 'workspaces';
+
+// --- WORKSPACES ---
+
+export const subscribeToWorkspaces = (callback: (workspaces: Workspace[]) => void) => {
+    const q = query(collection(db, WORKSPACES_COLLECTION), orderBy('order', 'asc'));
+    return onSnapshot(q, (snapshot) => {
+        const workspaces = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Workspace));
+
+        // Initial data logic: if 'escalas' is missing, it should be added manually or by a seeder.
+        // For now, we return what's in the DB.
+        callback(workspaces);
+    });
+};
+
+export const upsertWorkspace = async (workspace: Workspace) => {
+    const workspaceDoc = doc(db, WORKSPACES_COLLECTION, workspace.id);
+    await setDoc(workspaceDoc, {
+        ...workspace,
+        updatedAt: Date.now(),
+        isProtected: workspace.id === 'escalas' // Hard protection for 'escalas'
+    }, { merge: true });
+};
+
+export const deleteWorkspace = async (workspaceId: string) => {
+    if (workspaceId === 'escalas') return; // Protective guard
+    await deleteDoc(doc(db, WORKSPACES_COLLECTION, workspaceId));
+};
 
 // --- CARDS ---
 

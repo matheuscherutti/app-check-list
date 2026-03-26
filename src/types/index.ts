@@ -1,6 +1,6 @@
 export type Status = 'Pendente' | 'Concluído';
-export type EquipmentGroup = 'A320' | 'A330' | 'ATR' | 'ERJ' | 'Cmros';
-export type Team = 'Pré Assigment' | 'Jeppesen' | 'CAE';
+export type EquipmentGroup = string;
+export type Team = string;
 
 export interface SubTask {
     id: string;
@@ -11,7 +11,11 @@ export interface SubTask {
 export interface Workspace {
     id: string;
     name: string;
-    icon?: string;
+    isProtected?: boolean;
+    createdAt?: number;
+    order?: number;
+    sectors?: string[];
+    teams?: string[];
 }
 
 export interface Card {

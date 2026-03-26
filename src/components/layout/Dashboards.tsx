@@ -3,11 +3,14 @@ import type { Card } from '../../types';
 
 interface DashboardsProps {
     cards: Card[];
+    sectors: string[];
+    teams: string[];
 }
 
-export default function Dashboards({ cards }: DashboardsProps) {
+export default function Dashboards({ cards, sectors, teams }: DashboardsProps) {
     const calculations = useMemo(() => {
-        const WEIGHTS: Record<string, number> = {
+        // Default weights for known teams, fallback to 1 unit (100 / total_teams)
+        const PREDEFINED_WEIGHTS: Record<string, number> = {
             'Jeppesen': 50,
             'Pré Assigment': 33.33,
             'CAE': 16.95
@@ -17,33 +20,37 @@ export default function Dashboards({ cards }: DashboardsProps) {
             if (cardsToCalc.length === 0) return 0;
             let earned = 0;
             let possible = 0;
-            const teamsInCards = Array.from(new Set(cardsToCalc.map(c => c.team)));
 
-            teamsInCards.forEach(team => {
+            // We iterate over the teams defined in the workspace
+            teams.forEach(team => {
                 const teamCards = cardsToCalc.filter(c => c.team === team);
-                const weight = WEIGHTS[team] || 0;
-                if (weight > 0 && teamCards.length > 0) {
+                // Use predefined weights if available, or 1 as default
+                const weight = PREDEFINED_WEIGHTS[team] || 1;
+
+                if (teamCards.length > 0) {
                     const completedCount = teamCards.filter(c => c.status === 'Concluído').length;
                     const completionRate = completedCount / teamCards.length;
                     earned += completionRate * weight;
                     possible += weight;
                 }
             });
+
             if (possible === 0) return 0;
             return Math.min(100, Math.round((earned / possible) * 100));
         };
 
         const total = cards.length;
         const progressTotal = calculateWeightedProgress(cards);
-        const groups = ['A320', 'A330', 'ATR', 'ERJ', 'Cmros'];
-        const byEquipment = groups.map(group => {
+
+        // Use dynamically provided sectors (equipments) from workspace
+        const byEquipment = sectors.map(group => {
             const groupCards = cards.filter(c => c.equipment === group);
             const progress = calculateWeightedProgress(groupCards);
             return { group, progress, total: groupCards.length };
         });
 
         return { progressTotal, total, byEquipment };
-    }, [cards]);
+    }, [cards, sectors, teams]);
 
     return (
         <div className="bg-white/40 backdrop-blur-md border-b border-slate-200/60 py-4 mb-2 animate-in fade-in slide-in-from-top-4 duration-700">
@@ -82,13 +89,13 @@ export default function Dashboards({ cards }: DashboardsProps) {
                 {/* Progressão por Equipamento - Premium Horizontal Bars */}
                 <div className="flex-1 flex gap-10 items-center min-w-max">
                     {calculations.byEquipment.map((eq) => (
-                        <div key={eq.group} className="min-w-[140px] flex-1 group">
+                        <div key={eq.group} className="min-w-[145px] flex-1 group">
                             <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 transition-colors group-hover:text-slate-800">
-                                <div className="flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500/40 group-hover:bg-blue-600 transition-colors"></span>
-                                    <span>{eq.group}</span>
+                                <div className="flex items-center gap-1.5 overflow-hidden">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500/40 group-hover:bg-blue-600 transition-colors shrink-0"></span>
+                                    <span className="truncate">{eq.group}</span>
                                 </div>
-                                <span className="text-blue-600 font-black">{eq.progress}%</span>
+                                <span className="text-blue-600 font-black ml-2">{eq.progress}%</span>
                             </div>
                             <div className="h-2 bg-slate-100/80 rounded-full overflow-hidden border border-slate-200/20 shadow-inner p-[1px]">
                                 <div

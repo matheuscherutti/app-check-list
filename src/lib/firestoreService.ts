@@ -90,14 +90,12 @@ export const deleteCard = async (cardId: string) => {
 export const subscribeToMessages = (workspaceId: string, month: string, callback: (messages: Message[]) => void) => {
     const q = query(
         collection(db, MESSAGES_COLLECTION),
-        where('month', '==', month),
-        where('workspaceId', '==', workspaceId),
-        orderBy('createdAt', 'desc')
+        where('workspaceId', '==', workspaceId)
     );
     return onSnapshot(q, (snapshot) => {
         const messages = snapshot.docs
-            .map(doc => ({ ...doc.data(), id: doc.id } as Message))
-            .filter(m => (m.workspaceId || 'escalas') === workspaceId); // Migration safeguard
+            .map(doc => ({ id: doc.id, ...doc.data() } as Message))
+            .filter(msg => msg.month === month);
         callback(messages);
     });
 };

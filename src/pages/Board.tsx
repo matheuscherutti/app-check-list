@@ -51,15 +51,28 @@ export default function Board() {
 
     const { isOpen, editingCard, openEditCard, openNewCard, closeModal } = useModalStore();
     const { currentUser } = useUserStore();
-    const { getActiveWorkspace, activeWorkspaceId } = useWorkspaceStore();
-    const activeWorkspace = getActiveWorkspace();
-    const AVAILABLE_SECTORS = activeWorkspace?.sectors || [];
-    const AVAILABLE_TEAMS = activeWorkspace?.teams || [];
+    const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+    const { resetFilters } = useFilterStore();
+
+    const activeWorkspace = useMemo(() =>
+        workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0],
+        [workspaces, activeWorkspaceId]);
+
+    const AVAILABLE_SECTORS = useMemo(() => activeWorkspace?.sectors || [], [activeWorkspace]);
+    const AVAILABLE_TEAMS = useMemo(() => activeWorkspace?.teams || [], [activeWorkspace]);
 
     const displayedSectors = useMemo(() => {
         if (equipmentFilter === 'Todos') return AVAILABLE_SECTORS;
         return AVAILABLE_SECTORS.filter(s => s === equipmentFilter);
     }, [AVAILABLE_SECTORS, equipmentFilter]);
+
+    // Reset filters when switching workspaces
+    useEffect(() => {
+        const currentFilters = { searchQuery, statusFilter, teamFilter, equipmentFilter };
+        if (currentFilters.searchQuery !== '' || currentFilters.statusFilter !== 'Todos' || currentFilters.teamFilter !== 'Todos' || currentFilters.equipmentFilter !== 'Todos') {
+            resetFilters();
+        }
+    }, [activeWorkspaceId, resetFilters]);
 
     const [cards, setCards] = useState<Card[]>([]);
     const [messages, setMessages] = useState<Message[]>([]);
@@ -70,8 +83,14 @@ export default function Board() {
     useEffect(() => {
         const initial: Record<string, boolean> = {};
         AVAILABLE_TEAMS.forEach(t => { initial[t] = true; });
-        setExpandedTeams(prev => ({ ...initial, ...prev }));
-    }, [AVAILABLE_TEAMS, activeWorkspaceId]);
+
+        // Only update if the base set of teams is different to avoid infinite loops
+        setExpandedTeams(prev => {
+            const hasChanged = AVAILABLE_TEAMS.some(t => prev[t] === undefined);
+            if (!hasChanged) return prev;
+            return { ...initial, ...prev };
+        });
+    }, [AVAILABLE_TEAMS.join(','), activeWorkspaceId]);
 
     // --- Subscriptions ---
     useEffect(() => {
@@ -80,7 +99,11 @@ export default function Board() {
             const sortedData = [...data].sort((a, b) => (a.order || 0) - (b.order || 0));
             setCards(sortedData);
         });
-        const unsubMsg = subscribeToMessages(activeWorkspaceId, selectedMonth, (data) => setMessages(data));
+        const unsubMsg = subscribeToMessages(activeWorkspaceId, selectedMonth, (data) => {
+            // Sort by createdAt desc in memory because we removed Firestore orderBy to avoid index issues
+            const sorted = [...data].sort((a, b) => b.createdAt - a.createdAt);
+            setMessages(sorted);
+        });
         const unsubMonthly = subscribeToMonthlyData((data) => setMonthlyData(data));
 
         return () => {

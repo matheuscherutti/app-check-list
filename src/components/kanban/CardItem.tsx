@@ -1,5 +1,10 @@
 import { useState } from 'react';
 import { Menu, CheckCircle2, Circle, ChevronDown, ChevronUp, AlignLeft } from 'lucide-react';
+import {
+    SortableContext,
+    verticalListSortingStrategy
+} from '@dnd-kit/sortable';
+import SortableSubtaskItem from './SortableSubtaskItem';
 import type { Card } from '../../types';
 
 interface CardItemProps {
@@ -22,6 +27,8 @@ export default function CardItem({ card, openEditCard, onToggleStatus, onToggleS
     const totalSubTasks = hasSubTasks ? card.subTasks!.length : 0;
     const progressPercent = hasSubTasks && totalSubTasks > 0 ? (completedSubTasks / totalSubTasks) * 100 : 0;
     const hasNotes = Boolean(card.notes && card.notes.trim() !== '');
+
+    const subTaskIds = hasSubTasks ? card.subTasks!.map(st => st.id) : [];
 
     return (
         <div
@@ -107,25 +114,16 @@ export default function CardItem({ card, openEditCard, onToggleStatus, onToggleS
                     className="mt-3 pt-3 border-t border-slate-100 space-y-2 ml-8 mr-2"
                     onClick={(e) => e.stopPropagation()} // Prevent opening edit modal when clicking inside subtasks
                 >
-                    {card.subTasks!.map((st) => {
-                        const isSubTaskConcluido = st.status === 'Concluído';
-                        return (
-                            <div key={st.id} className="flex items-center justify-between group/subtask p-1.5 rounded-lg hover:bg-slate-50 transition-colors">
-                                <span className={`text-[11px] font-medium transition-colors ${isSubTaskConcluido ? 'text-slate-400 line-through' : 'text-slate-600 group-hover/subtask:text-slate-800'}`}>
-                                    {st.title}
-                                </span>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (onToggleSubTask) onToggleSubTask(card.id, st.id, st.status);
-                                    }}
-                                    className={`focus:outline-none active:scale-90 transition-transform ${isSubTaskConcluido ? 'text-emerald-600' : 'text-slate-300 hover:text-emerald-500'}`}
-                                >
-                                    {isSubTaskConcluido ? <CheckCircle2 size={16} className="fill-white" strokeWidth={2.5} /> : <Circle size={16} strokeWidth={2.5} />}
-                                </button>
-                            </div>
-                        );
-                    })}
+                    <SortableContext items={subTaskIds} strategy={verticalListSortingStrategy}>
+                        {card.subTasks!.map((st) => (
+                            <SortableSubtaskItem
+                                key={st.id}
+                                subTask={st}
+                                cardId={card.id}
+                                onToggleSubTask={onToggleSubTask!}
+                            />
+                        ))}
+                    </SortableContext>
                 </div>
             )}
         </div>

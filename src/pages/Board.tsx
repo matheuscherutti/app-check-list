@@ -391,6 +391,55 @@ export default function Board() {
         const activeId = active.id as string;
         const overId = over.id as string;
 
+        // --- SUBTASK DRAG-AND-DROP LOGIC ---
+        // Find if the dragged item is a subtask
+        let parentCardWithSubTask = cards.find(c =>
+            c.subTasks?.some(st => st.id === activeId)
+        );
+
+        if (parentCardWithSubTask) {
+            const subTasks = [...(parentCardWithSubTask.subTasks || [])];
+            const activeIndex = subTasks.findIndex(st => st.id === activeId);
+            const overIndex = subTasks.findIndex(st => st.id === overId);
+
+            if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
+                const newSubTasks = arrayMove(subTasks, activeIndex, overIndex);
+
+                // Persistence
+                const currentMonthly = (monthlyData[selectedMonth] && monthlyData[selectedMonth][parentCardWithSubTask.id]) || {};
+
+                if (currentMonthly.overrides) {
+                    // Update overrides
+                    await updateMonthlyCardData(selectedMonth, parentCardWithSubTask.id, {
+                        overrides: {
+                            ...currentMonthly.overrides,
+                            subTasks: newSubTasks.map(st => ({
+                                id: st.id,
+                                title: st.title,
+                                status: st.status
+                            }))
+                        }
+                    });
+                } else {
+                    // Update base card
+                    await upsertCardBase({
+                        ...parentCardWithSubTask,
+                        subTasks: newSubTasks
+                    });
+                }
+
+                await auditLog({
+                    user: currentUser?.name || 'Desconhecido',
+                    action: 'Reordenou',
+                    target: parentCardWithSubTask.title,
+                    details: `Reordenou subtarefas no mês ${selectedMonth}`,
+                    timestamp: Date.now()
+                });
+            }
+            return; // Subtask logic finished
+        }
+
+        // --- CARD DRAG-AND-DROP LOGIC (Original) ---
         const activeCard = cards.find(c => c.id === activeId);
         if (!activeCard) return;
 

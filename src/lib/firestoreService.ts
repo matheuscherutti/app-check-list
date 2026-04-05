@@ -16,7 +16,7 @@ import type { Card, Message, Workspace } from '../types';
 export interface AuditEntry {
     id: string;
     user: string;
-    action: 'Criou' | 'Editou' | 'Deletou' | 'Moveu' | 'Concluiu';
+    action: 'Criou' | 'Editou' | 'Deletou' | 'Moveu' | 'Concluiu' | 'Reordenou';
     target: string; // Title or ID
     details: string;
     timestamp: number;

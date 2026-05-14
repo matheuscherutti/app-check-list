@@ -12,7 +12,7 @@ interface CardItemProps {
     openEditCard: (card: Card) => void;
     onToggleStatus: (cardId: string, currentStatus: string) => void;
     onToggleSubTask?: (cardId: string, subTaskId: string, currentStatus: string) => void;
-    dragHandleProps?: any;
+    dragHandleProps?: Record<string, unknown>;
 }
 
 export default function CardItem({ card, openEditCard, onToggleStatus, onToggleSubTask, dragHandleProps }: CardItemProps) {

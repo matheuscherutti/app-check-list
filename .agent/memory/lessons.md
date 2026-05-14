@@ -29,3 +29,10 @@
 **Pitfall evitado:** Skills Globais (`~/.gemini/antigravity/skills/`) NÃO são versionadas no Git. Para projetos compartilháveis, usar Skills Locais (`.agent/skills/`). A portabilidade exige que tudo relevante esteja dentro do repositório.
 **Contexto:** Toda vez que precisar criar skills reutilizáveis e compartilháveis entre projetos e equipes.
 **Arquivos chave:** `.agent/skills/premium-design-orchestrator/`, `.agent/skills/brand-identity-extractor/`, `.agent/skills/premium-tech-stack/`
+
+## 2026-04-04 — Subtask Drag-and-Drop Reordering
+
+**Padrão identificado:** Utilização do `@dnd-kit/sortable` de forma aninhada para subtarefas, empregando um "drag handle" exclusivo (ícone dedicado) para garantir que apenas a intenção de mover a subtarefa seja capturada.
+**Pitfall evitado:** Evitar que a área interativa do item filho conflite com a área interativa do item pai (Cartão). O handle exclusivo isola os eventos.
+**Contexto:** Ao implementar reordenação de itens (ex: checklist) dentro de "conteineres" que também são arrastáveis (ex: cartões em Kanban).
+**Arquivos chave:** `src/components/kanban/SortableSubtaskItem.tsx`, `src/components/kanban/CardItem.tsx`, `src/pages/Board.tsx`

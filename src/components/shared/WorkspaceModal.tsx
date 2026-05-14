@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, Save, Plus, Trash2 } from 'lucide-react';
 import type { Workspace } from '../../types';
 
@@ -10,21 +10,12 @@ interface WorkspaceModalProps {
 }
 
 export default function WorkspaceModal({ isOpen, onClose, onSave, workspace }: WorkspaceModalProps) {
-    const [name, setName] = useState('');
-    const [sectors, setSectors] = useState<string[]>([]);
-    const [teams, setTeams] = useState<string[]>([]);
+    const [name, setName] = useState(workspace?.name || '');
+    const [type, setType] = useState<'checklist' | 'list'>(workspace?.type || 'checklist');
+    const [sectors, setSectors] = useState<string[]>(workspace?.sectors || []);
+    const [teams, setTeams] = useState<string[]>(workspace?.teams || []);
     const [newSector, setNewSector] = useState('');
     const [newTeam, setNewTeam] = useState('');
-
-    useEffect(() => {
-        if (isOpen) {
-            setName(workspace?.name || '');
-            setSectors(workspace?.sectors || []);
-            setTeams(workspace?.teams || []);
-            setNewSector('');
-            setNewTeam('');
-        }
-    }, [workspace, isOpen]);
 
     if (!isOpen) return null;
 
@@ -33,6 +24,7 @@ export default function WorkspaceModal({ isOpen, onClose, onSave, workspace }: W
         if (name.trim()) {
             onSave({
                 name: name.trim(),
+                type,
                 sectors,
                 teams
             });
@@ -76,7 +68,7 @@ export default function WorkspaceModal({ isOpen, onClose, onSave, workspace }: W
 
                 <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-8">
                     {/* Basic Info */}
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                         <div>
                             <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">
                                 Nome da Categoria
@@ -90,6 +82,47 @@ export default function WorkspaceModal({ isOpen, onClose, onSave, workspace }: W
                                 className="w-full px-4 py-3 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 font-bold text-slate-700 placeholder:text-slate-300"
                                 required
                             />
+                        </div>
+
+                        <div>
+                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">
+                                Tipo de Controle
+                            </label>
+                            <div className="grid grid-cols-2 gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setType('checklist')}
+                                    className={`p-4 rounded-2xl border-2 transition-all flex flex-col gap-2 text-left ${type === 'checklist'
+                                        ? 'border-blue-600 bg-blue-50/50 ring-4 ring-blue-50'
+                                        : 'border-slate-100 bg-slate-50/30 hover:border-slate-200'
+                                        }`}
+                                >
+                                    <div className={`p-2 rounded-lg w-fit ${type === 'checklist' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                                        <Plus size={18} />
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <p className={`text-xs font-black uppercase tracking-tight ${type === 'checklist' ? 'text-blue-600' : 'text-slate-700'}`}>Check List</p>
+                                        <p className="text-[10px] text-slate-400 font-medium leading-tight">Os itens se repetem para os meses seguintes.</p>
+                                    </div>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setType('list')}
+                                    className={`p-4 rounded-2xl border-2 transition-all flex flex-col gap-2 text-left ${type === 'list'
+                                        ? 'border-emerald-600 bg-emerald-50/50 ring-4 ring-emerald-50'
+                                        : 'border-slate-100 bg-slate-50/30 hover:border-slate-200'
+                                        }`}
+                                >
+                                    <div className={`p-2 rounded-lg w-fit ${type === 'list' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                                        <Trash2 size={18} />
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <p className={`text-xs font-black uppercase tracking-tight ${type === 'list' ? 'text-emerald-600' : 'text-slate-700'}`}>Lista do Mês</p>
+                                        <p className="text-[10px] text-slate-400 font-medium leading-tight">Itens valem apenas para o mês de criação.</p>
+                                    </div>
+                                </button>
+                            </div>
                         </div>
                     </div>
 

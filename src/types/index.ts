@@ -11,6 +11,7 @@ export interface SubTask {
 export interface Workspace {
     id: string;
     name: string;
+    type?: 'checklist' | 'list';
     isProtected?: boolean;
     createdAt?: number;
     order?: number;

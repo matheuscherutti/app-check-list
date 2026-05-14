@@ -34,10 +34,10 @@ export default function Layout() {
                 const defaultTeams = ['Pré Assigment', 'Jeppesen', 'CAE'];
 
                 const initial: Workspace[] = [
-                    { id: 'escalas', name: 'Check List - Escalas', isProtected: true, order: 0, sectors: defaultSectors, teams: defaultTeams },
-                    { id: 'payroll', name: 'Check List Payroll', order: 1, sectors: [], teams: [] },
-                    { id: 'diarias', name: 'Check List Diárias', order: 2, sectors: [], teams: [] },
-                    { id: 'treinamento', name: 'Check List Treinamento', order: 3, sectors: [], teams: [] }
+                    { id: 'escalas', name: 'Check List - Escalas', type: 'checklist', isProtected: true, order: 0, sectors: defaultSectors, teams: defaultTeams },
+                    { id: 'payroll', name: 'Check List Payroll', type: 'checklist', order: 1, sectors: [], teams: [] },
+                    { id: 'diarias', name: 'Check List Diárias', type: 'checklist', order: 2, sectors: [], teams: [] },
+                    { id: 'treinamento', name: 'Check List Treinamento', type: 'checklist', order: 3, sectors: [], teams: [] }
                 ];
                 initial.forEach(ws => upsertWorkspace(ws));
             } else {
@@ -90,6 +90,7 @@ export default function Layout() {
         await upsertWorkspace({
             id,
             name: data.name || '',
+            type: data.type || 'checklist',
             sectors: data.sectors || [],
             teams: data.teams || [],
             isProtected: editingWorkspace?.isProtected || false,
@@ -269,6 +270,7 @@ export default function Layout() {
             </header>
 
             <WorkspaceModal
+                key={editingWorkspace?.id || 'new'}
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onSave={handleSaveWorkspace}

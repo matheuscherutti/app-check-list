@@ -21,8 +21,9 @@ export default function Settings() {
     const handleSaveMember = async () => {
         if (!newName.trim()) return;
 
+        const now = Date.now(); // eslint-disable-line react-hooks/purity
         const memberData: User = {
-            id: editingMember ? editingMember.id : Date.now().toString(),
+            id: editingMember ? editingMember.id : now.toString(),
             name: newName,
             role: newRole,
             isActive: editingMember ? editingMember.isActive : true
@@ -34,7 +35,7 @@ export default function Settings() {
             action: editingMember ? 'Editou' : 'Criou',
             target: `Membro: ${memberData.name}`,
             details: `${editingMember ? 'Atualizou' : 'Adicionou'} ${memberData.name} como ${memberData.role}`,
-            timestamp: Date.now()
+            timestamp: now
         });
         closeModal();
     };
@@ -57,12 +58,13 @@ export default function Settings() {
         const member = members.find(m => m.id === id);
         if (window.confirm('Tem certeza que deseja remover este membro da equipe?')) {
             await deleteUser(id);
+            const now = Date.now();
             await auditLog({
                 user: currentUser?.name || 'Sistema',
                 action: 'Deletou',
                 target: `Membro: ${member?.name || id}`,
                 details: `Membro removido da equipe`,
-                timestamp: Date.now()
+                timestamp: now
             });
         }
     };
@@ -70,12 +72,13 @@ export default function Settings() {
     const handleToggleStatus = async (member: User) => {
         const newStatus = !member.isActive;
         await upsertUser({ ...member, isActive: newStatus });
+        const now = Date.now(); // eslint-disable-line react-hooks/purity
         await auditLog({
             user: currentUser?.name || 'Sistema',
             action: 'Editou',
             target: `Membro: ${member.name}`,
             details: `Status alterado para ${newStatus ? 'Ativo' : 'Inativo'}`,
-            timestamp: Date.now()
+            timestamp: now
         });
     };
 

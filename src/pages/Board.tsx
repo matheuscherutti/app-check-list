@@ -25,6 +25,7 @@ import {
     deleteMessage
 } from '../lib/firestoreService';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
+import { getNextMonth } from '../utils/dateHelper';
 import type { Message } from '../types';
 
 // --- Local constants ---
@@ -72,11 +73,12 @@ export default function Board() {
         if (currentFilters.searchQuery !== '' || currentFilters.statusFilter !== 'Todos' || currentFilters.teamFilter !== 'Todos' || currentFilters.equipmentFilter !== 'Todos') {
             resetFilters();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeWorkspaceId, resetFilters]);
 
     const [cards, setCards] = useState<Card[]>([]);
     const [messages, setMessages] = useState<Message[]>([]);
-    const [monthlyData, setMonthlyData] = useState<Record<string, any>>({});
+    const [monthlyData, setMonthlyData] = useState<Record<string, any>>({}); // eslint-disable-line @typescript-eslint/no-explicit-any
     const [isMuralExpanded, setIsMuralExpanded] = useState(true);
     const [expandedTeams, setExpandedTeams] = useState<Record<string, boolean>>({});
 
@@ -84,12 +86,13 @@ export default function Board() {
         const initial: Record<string, boolean> = {};
         AVAILABLE_TEAMS.forEach(t => { initial[t] = true; });
 
-        // Only update if the base set of teams is different to avoid infinite loops
+        // Update expanded teams only when AVAILABLE_TEAMS changes
         setExpandedTeams(prev => {
             const hasChanged = AVAILABLE_TEAMS.some(t => prev[t] === undefined);
             if (!hasChanged) return prev;
             return { ...initial, ...prev };
         });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [AVAILABLE_TEAMS.join(','), activeWorkspaceId]);
 
     // --- Subscriptions ---
@@ -130,7 +133,11 @@ export default function Board() {
                 let subTasksDefinition = card.subTasks || [];
                 let isMultiTask = card.isMultiTask || false;
 
-                const previousMonthsWithOverrides = allMonths.filter(m => m <= selectedMonth).reverse();
+                const isListType = activeWorkspace?.type === 'list';
+                const previousMonthsWithOverrides = isListType
+                    ? [selectedMonth]
+                    : allMonths.filter(m => m <= selectedMonth).reverse();
+
                 for (const m of previousMonthsWithOverrides) {
                     const override = monthlyData[m]?.[card.id]?.overrides;
                     if (override) {
@@ -167,7 +174,7 @@ export default function Board() {
                     }))
                 } as Card;
             });
-    }, [cards, monthlyData, selectedMonth]);
+    }, [cards, monthlyData, selectedMonth, activeWorkspace?.type]);
 
     // Filtering logic
     const filteredCards = useMemo(() => {
@@ -272,7 +279,7 @@ export default function Board() {
                 (data.isMultiTask !== undefined && data.isMultiTask !== editingCard.isMultiTask) ||
                 subTasksChanged;
 
-            const updateData: any = {
+            const updateData: Record<string, any> = { // eslint-disable-line @typescript-eslint/no-explicit-any
                 notes: data.notes || ''
             };
 
@@ -318,6 +325,7 @@ export default function Board() {
                 subTasks: data.subTasks || [],
                 notes: data.notes || '',
                 activeFrom: selectedMonth,
+                activeUntil: activeWorkspace?.type === 'list' ? getNextMonth(selectedMonth) : null,
                 createdAt: Date.now()
             };
             await upsertCard(newCard);
@@ -393,7 +401,7 @@ export default function Board() {
 
         // --- SUBTASK DRAG-AND-DROP LOGIC ---
         // Find if the dragged item is a subtask
-        let parentCardWithSubTask = cards.find(c =>
+        const parentCardWithSubTask = cards.find(c =>
             c.subTasks?.some(st => st.id === activeId)
         );
 
@@ -751,6 +759,7 @@ export default function Board() {
             </div>
 
             <CardModal
+                key={editingCard?.id || 'new'}
                 isOpen={isOpen}
                 onClose={closeModal}
                 card={editingCard}

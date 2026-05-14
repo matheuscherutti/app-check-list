@@ -5,7 +5,7 @@ import type { Card } from '../types';
 export const exportWorkspaceDataToCSV = async (workspaceId: string, month: string) => {
     try {
         // Obter todas as atividades do workspace atual
-        let cards: Card[] = [];
+        const cards: Card[] = [];
 
         // Verifica se é o workspace base (escalas) que possui cards legados
         if (workspaceId === 'escalas') {
@@ -45,7 +45,7 @@ export const exportWorkspaceDataToCSV = async (workspaceId: string, month: strin
             const baseStatus = card.status || 'Pendente';
 
             // Subtasks
-            let totalSub = card.subTasks?.length || 0;
+            const totalSub = card.subTasks?.length || 0;
             let completedSub = 0;
             if (totalSub > 0) {
                 card.subTasks?.forEach(sub => {

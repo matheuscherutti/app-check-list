@@ -22,3 +22,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Reports and temporary files
+eslint_report.json
+lint_results.txt
+lint_output.txt
+
+# Agent and temporary scripts
+.agent/
+tmp/
+

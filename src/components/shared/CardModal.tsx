@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, Plus, Trash2, MessageSquare } from 'lucide-react';
 import type { Card, EquipmentGroup, Team, SubTask } from '../../types';
 
@@ -23,37 +23,17 @@ export default function CardModal({
 }: CardModalProps) {
     const isEditing = !!(card as Card)?.id;
 
-    const [title, setTitle] = useState('');
-    const [equipment, setEquipment] = useState<EquipmentGroup>(availableEquipments[0] || '');
-    const [team, setTeam] = useState<Team>(availableTeams[0] || '');
+    const [title, setTitle] = useState(card?.title || '');
+    const [equipment, setEquipment] = useState<EquipmentGroup>(card?.equipment || availableEquipments[0] || '');
+    const [team, setTeam] = useState<Team>(card?.team || availableTeams[0] || '');
 
     // Multi task state
-    const [isMultiTask, setIsMultiTask] = useState(false);
-    const [subTasks, setSubTasks] = useState<SubTask[]>([]);
+    const [isMultiTask, setIsMultiTask] = useState(card?.isMultiTask || false);
+    const [subTasks, setSubTasks] = useState<SubTask[]>(card?.subTasks || []);
     const [newSubTaskTitle, setNewSubTaskTitle] = useState('');
 
     // Comments (Notes) state
-    const [notes, setNotes] = useState<string>('');
-
-    useEffect(() => {
-        if (isOpen) {
-            if (card) {
-                setTitle(card.title || '');
-                setEquipment(card.equipment || availableEquipments[0] || '');
-                setTeam(card.team || availableTeams[0] || '');
-                setIsMultiTask(card.isMultiTask || false);
-                setSubTasks(card.subTasks || []);
-                setNotes(card.notes || '');
-            } else {
-                setTitle('');
-                setEquipment(availableEquipments[0] || '');
-                setTeam(availableTeams[0] || '');
-                setIsMultiTask(false);
-                setSubTasks([]);
-                setNotes('');
-            }
-        }
-    }, [isOpen, card, availableEquipments, availableTeams]);
+    const [notes, setNotes] = useState<string>(card?.notes || '');
 
     if (!isOpen) return null;
 

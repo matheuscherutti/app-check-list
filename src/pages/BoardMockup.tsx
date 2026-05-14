@@ -115,7 +115,7 @@ export default function BoardMockup() {
                                 return (
                                     <button
                                         key={eq}
-                                        onClick={() => setSelectedEquip(eq as any)}
+                                        onClick={() => setSelectedEquip(eq as Equipment | 'Todos')}
                                         className={`
                                             px-4 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all
                                             ${isSelected

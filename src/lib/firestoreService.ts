@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import type { Card, Message, Workspace } from '../types';
+import type { User } from '../stores/useUserStore';
 
 export interface AuditEntry {
     id: string;
@@ -116,10 +117,10 @@ export const deleteMessage = async (messageId: string) => {
 
 // --- MONTHLY DATA (Status/Notes per month per card) ---
 
-export const subscribeToMonthlyData = (callback: (data: any) => void) => {
+export const subscribeToMonthlyData = (callback: (data: Record<string, any>) => void) => { // eslint-disable-line @typescript-eslint/no-explicit-any
     const q = query(collection(db, MONTHLY_DATA_COLLECTION));
     return onSnapshot(q, (snapshot) => {
-        const data: Record<string, any> = {};
+        const data: Record<string, any> = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
         snapshot.docs.forEach(doc => {
             data[doc.id] = doc.data();
         });
@@ -127,11 +128,11 @@ export const subscribeToMonthlyData = (callback: (data: any) => void) => {
     });
 };
 
-export const updateMonthlyCardData = async (month: string, cardId: string, updates: any) => {
+export const updateMonthlyCardData = async (month: string, cardId: string, updates: Record<string, any>) => { // eslint-disable-line @typescript-eslint/no-explicit-any
     const docRef = doc(db, MONTHLY_DATA_COLLECTION, month);
 
     // Prepare dot notation updates for updateDoc
-    const dotUpdates: any = {};
+    const dotUpdates: Record<string, any> = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
     Object.keys(updates).forEach(key => {
         dotUpdates[`${cardId}.${key}`] = updates[key];
     });
@@ -139,7 +140,7 @@ export const updateMonthlyCardData = async (month: string, cardId: string, updat
     try {
         // Try updateDoc first (handles nested updates efficiently)
         await updateDoc(docRef, dotUpdates);
-    } catch (e: any) {
+    } catch (e: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
         // If document doesn't exist, create it with setDoc using NESTED object structure
         if (e.code === 'not-found') {
             await setDoc(docRef, { [cardId]: updates }, { merge: true });
@@ -153,7 +154,7 @@ export const updateMonthlyCardData = async (month: string, cardId: string, updat
 
 // --- USERS (Equipe) ---
 
-export const subscribeToUsers = (callback: (users: any[]) => void) => {
+export const subscribeToUsers = (callback: (users: any[]) => void) => { // eslint-disable-line @typescript-eslint/no-explicit-any
     const q = query(collection(db, USERS_COLLECTION), orderBy('name', 'asc'));
     return onSnapshot(q, (snapshot) => {
         const users = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
@@ -161,7 +162,7 @@ export const subscribeToUsers = (callback: (users: any[]) => void) => {
     });
 };
 
-export const upsertUser = async (user: any) => {
+export const upsertUser = async (user: User) => {
     const userDoc = doc(db, USERS_COLLECTION, user.id);
     await setDoc(userDoc, { ...user, updatedAt: Date.now() }, { merge: true });
 };

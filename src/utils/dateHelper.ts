@@ -32,3 +32,10 @@ export function formatMonthLabel(monthId: string) {
     const monthLabel = monthNamesDict[month] || '';
     return `${monthLabel.toUpperCase()} ${year}`;
 }
+
+export function getNextMonth(monthId: string) {
+    if (!monthId) return '';
+    const [year, month] = monthId.split('-').map(Number);
+    const date = new Date(year, month - 1, 1);
+    return format(addMonths(date, 1), 'yyyy-MM');
+}

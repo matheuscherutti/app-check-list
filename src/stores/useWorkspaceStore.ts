@@ -10,7 +10,7 @@ interface WorkspaceState {
     getActiveWorkspace: () => Workspace;
 }
 
-const DEFAULT_WORKSPACE: Workspace = { id: 'escalas', name: 'Check List - Escalas', isProtected: true };
+const DEFAULT_WORKSPACE: Workspace = { id: 'escalas', name: 'Check List - Escalas', type: 'checklist', isProtected: true };
 
 export const useWorkspaceStore = create<WorkspaceState>()(
     persist(

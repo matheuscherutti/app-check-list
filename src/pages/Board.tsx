@@ -59,8 +59,24 @@ export default function Board() {
         workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0],
         [workspaces, activeWorkspaceId]);
 
-    const AVAILABLE_SECTORS = useMemo(() => activeWorkspace?.sectors || [], [activeWorkspace]);
-    const AVAILABLE_TEAMS = useMemo(() => activeWorkspace?.teams || [], [activeWorkspace]);
+    const [cards, setCards] = useState<Card[]>([]);
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [monthlyData, setMonthlyData] = useState<Record<string, any>>({}); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const [isMuralExpanded, setIsMuralExpanded] = useState(true);
+    const [expandedTeams, setExpandedTeams] = useState<Record<string, boolean>>({});
+
+    const AVAILABLE_SECTORS = useMemo(() => {
+        if (activeWorkspace?.sectors && activeWorkspace.sectors.length > 0) return activeWorkspace.sectors;
+        const discovered = Array.from(new Set(cards.map(c => c.equipment))).filter(Boolean).sort();
+        return discovered.length > 0 ? discovered : ['Geral'];
+    }, [activeWorkspace, cards]);
+
+    const AVAILABLE_TEAMS = useMemo(() => {
+        if (activeWorkspace?.teams && activeWorkspace.teams.length > 0) return activeWorkspace.teams;
+        const discovered = Array.from(new Set(cards.map(c => c.team))).filter(Boolean).sort();
+        return discovered.length > 0 ? discovered : ['Equipe Geral'];
+    }, [activeWorkspace, cards]);
+
 
     const displayedSectors = useMemo(() => {
         if (equipmentFilter === 'Todos') return AVAILABLE_SECTORS;
@@ -76,11 +92,6 @@ export default function Board() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeWorkspaceId, resetFilters]);
 
-    const [cards, setCards] = useState<Card[]>([]);
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [monthlyData, setMonthlyData] = useState<Record<string, any>>({}); // eslint-disable-line @typescript-eslint/no-explicit-any
-    const [isMuralExpanded, setIsMuralExpanded] = useState(true);
-    const [expandedTeams, setExpandedTeams] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
         const initial: Record<string, boolean> = {};

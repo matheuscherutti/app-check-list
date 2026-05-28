@@ -107,7 +107,7 @@ export default function CardModal({
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Equipamento</label>
+                                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Setor / Equipamento</label>
                                 {availableEquipments.length > 0 ? (
                                     <select
                                         value={equipment}
@@ -127,7 +127,7 @@ export default function CardModal({
                                 )}
                             </div>
                             <div>
-                                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Setor</label>
+                                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Time / Equipe</label>
                                 {availableTeams.length > 0 ? (
                                     <select
                                         value={team}

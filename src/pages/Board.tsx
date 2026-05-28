@@ -133,11 +133,14 @@ export default function Board() {
 
         return cards
             .filter(c => {
-                const isAfterStart = (c.activeFrom || '') <= selectedMonth;
+                // If it's a Checklist (standard), usually we don't have date constraints
+                // or if we have, they must match the selected month.
+                const isAfterStart = !c.activeFrom || c.activeFrom <= selectedMonth;
                 const isBeforeEnd = !c.activeUntil || c.activeUntil > selectedMonth;
                 return isAfterStart && isBeforeEnd;
             })
             .map(card => {
+
                 let title = card.title;
                 let team = card.team;
                 let equipment = card.equipment;
@@ -324,11 +327,13 @@ export default function Board() {
         } else {
             if (!activeWorkspaceId) return;
             const cardId = Math.random().toString(36).substr(2, 9);
+            const isListWorkspace = activeWorkspace?.type === 'list';
+
             const newCard: Card = {
                 id: cardId,
                 workspaceId: activeWorkspaceId as string,
-                title: data.title || '',
-                equipment: (data.equipment || (AVAILABLE_SECTORS[0] || 'Setor')) as EquipmentGroup,
+                title: data.title || 'Nova Atividade',
+                equipment: (data.equipment || (AVAILABLE_SECTORS[0] || 'Geral')) as EquipmentGroup,
                 team: (data.team || (AVAILABLE_TEAMS[0] || 'Time')) as Team,
                 status: 'Pendente',
                 order: cards.length,
@@ -336,9 +341,10 @@ export default function Board() {
                 subTasks: data.subTasks || [],
                 notes: data.notes || '',
                 activeFrom: selectedMonth,
-                activeUntil: activeWorkspace?.type === 'list' ? getNextMonth(selectedMonth) : null,
+                activeUntil: isListWorkspace ? getNextMonth(selectedMonth) : null,
                 createdAt: Date.now()
             };
+
             await upsertCard(newCard);
 
             await auditLog({

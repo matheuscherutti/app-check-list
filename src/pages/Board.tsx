@@ -1,790 +1,983 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useFilterStore } from '../stores/useFilterStore';
-import { useModalStore } from '../stores/useModalStore';
-import { useUserStore } from '../stores/useUserStore';
-import CardModal from '../components/shared/CardModal';
-import KanbanColumn from '../components/kanban/KanbanColumn';
-import SortableCardItem from '../components/kanban/SortableCardItem';
-import Dashboards from '../components/layout/Dashboards';
+import { useState, useMemo, useEffect } from "react";
+import { useFilterStore } from "../stores/useFilterStore";
+import { useModalStore } from "../stores/useModalStore";
+import { useUserStore } from "../stores/useUserStore";
+import CardModal from "../components/shared/CardModal";
+import KanbanColumn from "../components/kanban/KanbanColumn";
+import SortableCardItem from "../components/kanban/SortableCardItem";
+import Dashboards from "../components/layout/Dashboards";
+import { DndContext, closestCorners } from "@dnd-kit/core";
+import { arrayMove } from "@dnd-kit/sortable";
+import type { DragEndEvent } from "@dnd-kit/core";
+import type { Card, EquipmentGroup, Team, Status } from "../types";
+import confetti from "canvas-confetti";
 import {
-    DndContext, closestCorners
-} from '@dnd-kit/core';
-import { arrayMove } from '@dnd-kit/sortable';
-import type { DragEndEvent } from '@dnd-kit/core';
-import type { Card, EquipmentGroup, Team, Status } from '../types';
-import confetti from 'canvas-confetti';
-import { Search, Plus, MessageSquare, ChevronDown, ChevronRight, Trash2, Filter, ChevronLeft } from 'lucide-react';
+  Search,
+  Plus,
+  MessageSquare,
+  ChevronDown,
+  ChevronRight,
+  Trash2,
+  Filter,
+  ChevronLeft,
+} from "lucide-react";
 import {
-    subscribeToCards,
-    subscribeToMessages,
-    subscribeToMonthlyData,
-    updateMonthlyCardData,
-    auditLog,
-    upsertCard as upsertCardBase,
-    addMessage,
-    deleteMessage
-} from '../lib/firestoreService';
-import { useWorkspaceStore } from '../stores/useWorkspaceStore';
-import { getNextMonth } from '../utils/dateHelper';
-import type { Message } from '../types';
+  subscribeToCards,
+  subscribeToMessages,
+  subscribeToMonthlyData,
+  updateMonthlyCardData,
+  auditLog,
+  upsertCard as upsertCardBase,
+  addMessage,
+  deleteMessage,
+} from "../lib/firestoreService";
+import { useWorkspaceStore } from "../stores/useWorkspaceStore";
+import { getNextMonth } from "../utils/dateHelper";
+import type { Message } from "../types";
 
 // --- Local constants ---
 // Configuração de cores por equipe (Default fallback patterns)
 const TEAM_CONFIG_BASE = [
-    { headerBg: 'bg-indigo-600', progressColor: 'bg-indigo-600', lightBg: 'bg-slate-50/80', accentText: 'text-indigo-600' },
-    { headerBg: 'bg-blue-600', progressColor: 'bg-blue-600', lightBg: 'bg-slate-50/80', accentText: 'text-blue-600' },
-    { headerBg: 'bg-cyan-600', progressColor: 'bg-cyan-600', lightBg: 'bg-slate-50/80', accentText: 'text-cyan-600' },
-    { headerBg: 'bg-emerald-600', progressColor: 'bg-emerald-600', lightBg: 'bg-slate-50/80', accentText: 'text-emerald-600' },
-    { headerBg: 'bg-violet-600', progressColor: 'bg-violet-600', lightBg: 'bg-slate-50/80', accentText: 'text-violet-600' },
+  {
+    headerBg: "bg-indigo-600",
+    progressColor: "bg-indigo-600",
+    lightBg: "bg-slate-50/80",
+    accentText: "text-indigo-600",
+  },
+  {
+    headerBg: "bg-blue-600",
+    progressColor: "bg-blue-600",
+    lightBg: "bg-slate-50/80",
+    accentText: "text-blue-600",
+  },
+  {
+    headerBg: "bg-cyan-600",
+    progressColor: "bg-cyan-600",
+    lightBg: "bg-slate-50/80",
+    accentText: "text-cyan-600",
+  },
+  {
+    headerBg: "bg-emerald-600",
+    progressColor: "bg-emerald-600",
+    lightBg: "bg-slate-50/80",
+    accentText: "text-emerald-600",
+  },
+  {
+    headerBg: "bg-violet-600",
+    progressColor: "bg-violet-600",
+    lightBg: "bg-slate-50/80",
+    accentText: "text-violet-600",
+  },
 ];
 
 const getTeamConfig = (teamName: string, teams: string[]) => {
-    const index = teams.indexOf(teamName);
-    if (index === -1) return TEAM_CONFIG_BASE[0];
-    return TEAM_CONFIG_BASE[index % TEAM_CONFIG_BASE.length];
+  const index = teams.indexOf(teamName);
+  if (index === -1) return TEAM_CONFIG_BASE[0];
+  return TEAM_CONFIG_BASE[index % TEAM_CONFIG_BASE.length];
 };
 
 export default function Board() {
-    const {
-        searchQuery, setSearchQuery, statusFilter, teamFilter, equipmentFilter, setEquipmentFilter,
-        selectedMonth
-    } = useFilterStore();
+  const {
+    searchQuery,
+    setSearchQuery,
+    statusFilter,
+    teamFilter,
+    equipmentFilter,
+    setEquipmentFilter,
+    selectedMonth,
+  } = useFilterStore();
 
-    const { isOpen, editingCard, openEditCard, openNewCard, closeModal } = useModalStore();
-    const { currentUser } = useUserStore();
-    const { activeWorkspaceId, workspaces } = useWorkspaceStore();
-    const { resetFilters } = useFilterStore();
+  const { isOpen, editingCard, openEditCard, openNewCard, closeModal } =
+    useModalStore();
+  const { currentUser } = useUserStore();
+  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const { resetFilters } = useFilterStore();
 
-    const activeWorkspace = useMemo(() =>
-        workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0],
-        [workspaces, activeWorkspaceId]);
+  const activeWorkspace = useMemo(
+    () => workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0],
+    [workspaces, activeWorkspaceId],
+  );
 
-    const [cards, setCards] = useState<Card[]>([]);
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [monthlyData, setMonthlyData] = useState<Record<string, any>>({}); // eslint-disable-line @typescript-eslint/no-explicit-any
-    const [isMuralExpanded, setIsMuralExpanded] = useState(true);
-    const [expandedTeams, setExpandedTeams] = useState<Record<string, boolean>>({});
+  const [cards, setCards] = useState<Card[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [monthlyData, setMonthlyData] = useState<Record<string, any>>({}); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const [isMuralExpanded, setIsMuralExpanded] = useState(true);
+  const [expandedTeams, setExpandedTeams] = useState<Record<string, boolean>>(
+    {},
+  );
 
-    const AVAILABLE_SECTORS = useMemo(() => {
-        if (activeWorkspace?.sectors && activeWorkspace.sectors.length > 0) return activeWorkspace.sectors;
-        const discovered = Array.from(new Set(cards.map(c => c.equipment))).filter(Boolean).sort();
-        return discovered.length > 0 ? discovered : ['Geral'];
-    }, [activeWorkspace, cards]);
+  const AVAILABLE_SECTORS = useMemo(() => {
+    if (activeWorkspace?.sectors && activeWorkspace.sectors.length > 0)
+      return activeWorkspace.sectors;
+    const discovered = Array.from(new Set(cards.map((c) => c.equipment)))
+      .filter(Boolean)
+      .sort();
+    return discovered.length > 0 ? discovered : ["Geral"];
+  }, [activeWorkspace, cards]);
 
-    const AVAILABLE_TEAMS = useMemo(() => {
-        if (activeWorkspace?.teams && activeWorkspace.teams.length > 0) return activeWorkspace.teams;
-        const discovered = Array.from(new Set(cards.map(c => c.team))).filter(Boolean).sort();
-        return discovered.length > 0 ? discovered : ['Equipe Geral'];
-    }, [activeWorkspace, cards]);
+  const AVAILABLE_TEAMS = useMemo(() => {
+    if (activeWorkspace?.teams && activeWorkspace.teams.length > 0)
+      return activeWorkspace.teams;
+    const discovered = Array.from(new Set(cards.map((c) => c.team)))
+      .filter(Boolean)
+      .sort();
+    return discovered.length > 0 ? discovered : ["Equipe Geral"];
+  }, [activeWorkspace, cards]);
 
+  const displayedSectors = useMemo(() => {
+    if (equipmentFilter === "Todos") return AVAILABLE_SECTORS;
+    return AVAILABLE_SECTORS.filter((s) => s === equipmentFilter);
+  }, [AVAILABLE_SECTORS, equipmentFilter]);
 
-    const displayedSectors = useMemo(() => {
-        if (equipmentFilter === 'Todos') return AVAILABLE_SECTORS;
-        return AVAILABLE_SECTORS.filter(s => s === equipmentFilter);
-    }, [AVAILABLE_SECTORS, equipmentFilter]);
+  // Reset filters when switching workspaces
+  useEffect(() => {
+    const currentFilters = {
+      searchQuery,
+      statusFilter,
+      teamFilter,
+      equipmentFilter,
+    };
+    if (
+      currentFilters.searchQuery !== "" ||
+      currentFilters.statusFilter !== "Todos" ||
+      currentFilters.teamFilter !== "Todos" ||
+      currentFilters.equipmentFilter !== "Todos"
+    ) {
+      resetFilters();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWorkspaceId, resetFilters]);
 
-    // Reset filters when switching workspaces
-    useEffect(() => {
-        const currentFilters = { searchQuery, statusFilter, teamFilter, equipmentFilter };
-        if (currentFilters.searchQuery !== '' || currentFilters.statusFilter !== 'Todos' || currentFilters.teamFilter !== 'Todos' || currentFilters.equipmentFilter !== 'Todos') {
-            resetFilters();
+  useEffect(() => {
+    const initial: Record<string, boolean> = {};
+    AVAILABLE_TEAMS.forEach((t) => {
+      initial[t] = true;
+    });
+
+    // Update expanded teams only when AVAILABLE_TEAMS changes
+    setExpandedTeams((prev) => {
+      const hasChanged = AVAILABLE_TEAMS.some((t) => prev[t] === undefined);
+      if (!hasChanged) return prev;
+      return { ...initial, ...prev };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [AVAILABLE_TEAMS.join(","), activeWorkspaceId]);
+
+  // --- Subscriptions ---
+  useEffect(() => {
+    const unsubCards = subscribeToCards(activeWorkspaceId, (data) => {
+      // Sort locally by order field
+      const sortedData = [...data].sort(
+        (a, b) => (a.order || 0) - (b.order || 0),
+      );
+      setCards(sortedData);
+    });
+    const unsubMsg = subscribeToMessages(
+      activeWorkspaceId,
+      selectedMonth,
+      (data) => {
+        // Sort by createdAt desc in memory because we removed Firestore orderBy to avoid index issues
+        const sorted = [...data].sort((a, b) => b.createdAt - a.createdAt);
+        setMessages(sorted);
+      },
+    );
+    const unsubMonthly = subscribeToMonthlyData((data) => setMonthlyData(data));
+
+    return () => {
+      unsubCards();
+      unsubMsg();
+      unsubMonthly();
+    };
+  }, [selectedMonth, activeWorkspaceId]);
+
+  // Merge global card data with monthly overrides and versioning
+  const mergedCards = useMemo(() => {
+    const allMonths = Object.keys(monthlyData).sort();
+
+    return cards
+      .filter((c) => {
+        // If it's a Checklist (standard), usually we don't have date constraints
+        // or if we have, they must match the selected month.
+        const isAfterStart = !c.activeFrom || c.activeFrom <= selectedMonth;
+        const isBeforeEnd = !c.activeUntil || c.activeUntil > selectedMonth;
+        return isAfterStart && isBeforeEnd;
+      })
+      .map((card) => {
+        let title = card.title;
+        let team = card.team;
+        let equipment = card.equipment;
+        let subTasksDefinition = card.subTasks || [];
+        let isMultiTask = card.isMultiTask || false;
+
+        const isListType = activeWorkspace?.type === "list";
+        const previousMonthsWithOverrides = isListType
+          ? [selectedMonth]
+          : allMonths.filter((m) => m <= selectedMonth).reverse();
+
+        for (const m of previousMonthsWithOverrides) {
+          const override = monthlyData[m]?.[card.id]?.overrides;
+          if (override) {
+            if (override.title) title = override.title;
+            if (override.team) team = override.team;
+            if (override.equipment) equipment = override.equipment;
+            if (override.subTasks) subTasksDefinition = override.subTasks;
+            if (override.isMultiTask !== undefined)
+              isMultiTask = override.isMultiTask;
+            break;
+          }
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeWorkspaceId, resetFilters]);
 
+        const monthInfo =
+          (monthlyData[selectedMonth] && monthlyData[selectedMonth][card.id]) ||
+          {};
 
-    useEffect(() => {
-        const initial: Record<string, boolean> = {};
-        AVAILABLE_TEAMS.forEach(t => { initial[t] = true; });
+        const subTasks =
+          subTasksDefinition.map((st) => ({
+            ...st,
+            status:
+              (monthInfo.subTasksStatuses &&
+                monthInfo.subTasksStatuses[st.id]) ||
+              st.status,
+          })) || [];
 
-        // Update expanded teams only when AVAILABLE_TEAMS changes
-        setExpandedTeams(prev => {
-            const hasChanged = AVAILABLE_TEAMS.some(t => prev[t] === undefined);
-            if (!hasChanged) return prev;
-            return { ...initial, ...prev };
+        const isActuallyCompleted = isMultiTask
+          ? subTasks.length > 0 &&
+            subTasks.every((st) => st.status === "Concluído")
+          : (monthInfo.status || card.status) === "Concluído";
+
+        return {
+          ...card,
+          title,
+          team,
+          equipment: equipment as EquipmentGroup,
+          status: (isActuallyCompleted ? "Concluído" : "Pendente") as Status,
+          notes: monthInfo.notes || card.notes,
+          subTasks: subTasks.map((st) => ({
+            ...st,
+            status: (st.status || "Pendente") as Status,
+          })),
+        } as Card;
+      });
+  }, [cards, monthlyData, selectedMonth, activeWorkspace?.type]);
+
+  // Filtering logic
+  const filteredCards = useMemo(() => {
+    return mergedCards.filter((card) => {
+      const matchesSearch = card.title
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
+      const matchesStatus =
+        statusFilter === "Todos" ||
+        (statusFilter === "Pendentes"
+          ? card.status !== "Concluído"
+          : card.status === "Concluído");
+      const matchesTeam = teamFilter === "Todos" || card.team === teamFilter;
+      const matchesEquip =
+        equipmentFilter === "Todos" || card.equipment === equipmentFilter;
+
+      return matchesSearch && matchesStatus && matchesTeam && matchesEquip;
+    });
+  }, [mergedCards, searchQuery, statusFilter, teamFilter, equipmentFilter]);
+
+  // --- Actions ---
+  const handleToggleStatus = async (cardId: string, currentStatus: string) => {
+    const newStatus = currentStatus === "Concluído" ? "Pendente" : "Concluído";
+    const card = cards.find((c) => c.id === cardId);
+    if (!card) return;
+
+    await updateMonthlyCardData(selectedMonth, cardId, { status: newStatus });
+
+    await auditLog({
+      user: currentUser?.name || "Desconhecido",
+      action: "Concluiu",
+      target: card.title,
+      details: `Status alterado para ${newStatus} no mês ${selectedMonth}`,
+      timestamp: Date.now(),
+    });
+
+    if (newStatus === "Concluído") {
+      confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ["#2563eb", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"],
+      });
+    }
+  };
+
+  const handleToggleSubTask = async (
+    cardId: string,
+    subTaskId: string,
+    currentStatus: string,
+  ) => {
+    const newStatus = currentStatus === "Concluído" ? "Pendente" : "Concluído";
+    const card = cards.find((c) => c.id === cardId);
+    if (!card) return;
+
+    const currentMonthly =
+      (monthlyData[selectedMonth] && monthlyData[selectedMonth][cardId]) || {};
+    const subTasksStatuses = { ...(currentMonthly.subTasksStatuses || {}) };
+    subTasksStatuses[subTaskId] = newStatus;
+
+    await updateMonthlyCardData(selectedMonth, cardId, { subTasksStatuses });
+
+    if (newStatus === "Concluído") {
+      // Check if ALL subtasks are now completed
+      const dbCard = cards.find((c) => c.id === cardId) || card;
+      const updatedMonthly =
+        (monthlyData[selectedMonth] && monthlyData[selectedMonth][cardId]) ||
+        {};
+      const finalSubTasksStatuses = {
+        ...(updatedMonthly.subTasksStatuses || {}),
+        [subTaskId]: newStatus,
+      };
+
+      const totalSubTasks = dbCard.subTasks?.length || 0;
+      const completedSubTasks =
+        dbCard.subTasks?.filter((st) => {
+          const mst = finalSubTasksStatuses[st.id];
+          return mst !== undefined
+            ? mst === "Concluído"
+            : st.status === "Concluído";
+        }).length || 0;
+
+      if (totalSubTasks > 0 && completedSubTasks === totalSubTasks) {
+        // ALL subtasks completed, big confetti!
+        confetti({
+          particleCount: 200,
+          spread: 100,
+          origin: { y: 0.6 },
+          colors: ["#2563eb", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"],
+          zIndex: 9999,
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [AVAILABLE_TEAMS.join(','), activeWorkspaceId]);
-
-    // --- Subscriptions ---
-    useEffect(() => {
-        const unsubCards = subscribeToCards(activeWorkspaceId, (data) => {
-            // Sort locally by order field
-            const sortedData = [...data].sort((a, b) => (a.order || 0) - (b.order || 0));
-            setCards(sortedData);
+      } else {
+        // Small confetti for single subtask
+        confetti({
+          particleCount: 50,
+          spread: 40,
+          origin: { y: 0.7 },
+          zIndex: 9999,
         });
-        const unsubMsg = subscribeToMessages(activeWorkspaceId, selectedMonth, (data) => {
-            // Sort by createdAt desc in memory because we removed Firestore orderBy to avoid index issues
-            const sorted = [...data].sort((a, b) => b.createdAt - a.createdAt);
-            setMessages(sorted);
-        });
-        const unsubMonthly = subscribeToMonthlyData((data) => setMonthlyData(data));
+      }
+    }
+  };
 
-        return () => {
-            unsubCards();
-            unsubMsg();
-            unsubMonthly();
+  const upsertCard = async (card: Card) => {
+    const safeCard = {
+      ...card,
+      activeFrom: card.activeFrom || selectedMonth,
+    };
+    await upsertCardBase(safeCard);
+  };
+
+  const handleSaveCard = async (data: Partial<Card>) => {
+    if (editingCard && "id" in editingCard) {
+      const subTasksChanged =
+        data.subTasks?.length !== editingCard.subTasks?.length ||
+        JSON.stringify(data.subTasks?.map((s) => s.title)) !==
+          JSON.stringify(editingCard.subTasks?.map((s) => s.title));
+
+      const hasStructuralChanges =
+        (data.title && data.title !== editingCard.title) ||
+        (data.team && data.team !== editingCard.team) ||
+        (data.equipment && data.equipment !== editingCard.equipment) ||
+        (data.isMultiTask !== undefined &&
+          data.isMultiTask !== editingCard.isMultiTask) ||
+        subTasksChanged;
+
+      const updateData: Record<string, any> = {
+        // eslint-disable-line @typescript-eslint/no-explicit-any
+        notes: data.notes || "",
+      };
+
+      if (hasStructuralChanges) {
+        updateData.overrides = {
+          title: data.title,
+          team: data.team,
+          equipment: data.equipment,
+          isMultiTask: data.isMultiTask,
+          subTasks: data.subTasks?.map((st) => ({
+            id: st.id,
+            title: st.title,
+            status: "Pendente",
+          })),
         };
-    }, [selectedMonth, activeWorkspaceId]);
+      }
 
-    // Merge global card data with monthly overrides and versioning
-    const mergedCards = useMemo(() => {
-        const allMonths = Object.keys(monthlyData).sort();
+      if (editingCard?.id) {
+        await updateMonthlyCardData(selectedMonth, editingCard.id, updateData);
 
-        return cards
-            .filter(c => {
-                // If it's a Checklist (standard), usually we don't have date constraints
-                // or if we have, they must match the selected month.
-                const isAfterStart = !c.activeFrom || c.activeFrom <= selectedMonth;
-                const isBeforeEnd = !c.activeUntil || c.activeUntil > selectedMonth;
-                return isAfterStart && isBeforeEnd;
-            })
-            .map(card => {
+        if (hasStructuralChanges) {
+          await auditLog({
+            user: currentUser?.name || "Desconhecido",
+            action: "Editou",
+            target: data.title || editingCard.title || "Atividade",
+            details: `Alterou propriedades no mês ${selectedMonth}.`,
+            timestamp: Date.now(),
+          });
+        }
+      }
+    } else {
+      if (!activeWorkspaceId) return;
+      const cardId = Math.random().toString(36).substr(2, 9);
+      const isListWorkspace = activeWorkspace?.type === "list";
 
-                let title = card.title;
-                let team = card.team;
-                let equipment = card.equipment;
-                let subTasksDefinition = card.subTasks || [];
-                let isMultiTask = card.isMultiTask || false;
+      const newCard: Card = {
+        id: cardId,
+        workspaceId: activeWorkspaceId as string,
+        title: data.title || "Nova Atividade",
+        equipment: (data.equipment ||
+          AVAILABLE_SECTORS[0] ||
+          "Geral") as EquipmentGroup,
+        team: (data.team || AVAILABLE_TEAMS[0] || "Time") as Team,
+        status: "Pendente",
+        order: cards.length,
+        isMultiTask: data.isMultiTask || false,
+        subTasks: data.subTasks || [],
+        notes: data.notes || "",
+        activeFrom: selectedMonth,
+        activeUntil: isListWorkspace ? getNextMonth(selectedMonth) : null,
+        createdAt: Date.now(),
+      };
 
-                const isListType = activeWorkspace?.type === 'list';
-                const previousMonthsWithOverrides = isListType
-                    ? [selectedMonth]
-                    : allMonths.filter(m => m <= selectedMonth).reverse();
+      await upsertCard(newCard);
 
-                for (const m of previousMonthsWithOverrides) {
-                    const override = monthlyData[m]?.[card.id]?.overrides;
-                    if (override) {
-                        if (override.title) title = override.title;
-                        if (override.team) team = override.team;
-                        if (override.equipment) equipment = override.equipment;
-                        if (override.subTasks) subTasksDefinition = override.subTasks;
-                        if (override.isMultiTask !== undefined) isMultiTask = override.isMultiTask;
-                        break;
-                    }
-                }
+      await auditLog({
+        user: currentUser?.name || "Desconhecido",
+        action: "Criou",
+        target: newCard.title,
+        details: `Atividade criada no controle de ${selectedMonth}`,
+        timestamp: Date.now(),
+      });
+    }
+    closeModal();
+  };
 
-                const monthInfo = (monthlyData[selectedMonth] && monthlyData[selectedMonth][card.id]) || {};
+  const handleDeleteCard = async (id: string) => {
+    const card = cards.find((c) => c.id === id);
+    if (!card) return;
 
-                const subTasks = subTasksDefinition.map(st => ({
-                    ...st,
-                    status: (monthInfo.subTasksStatuses && monthInfo.subTasksStatuses[st.id]) || st.status
-                })) || [];
+    if (
+      window.confirm(
+        `Tem certeza que deseja remover "${card.title}" a partir de ${selectedMonth}? (O histórico de meses anteriores será preservado)`,
+      )
+    ) {
+      await upsertCard({ ...card, activeUntil: selectedMonth });
 
-                const isActuallyCompleted = isMultiTask
-                    ? (subTasks.length > 0 && subTasks.every(st => st.status === 'Concluído'))
-                    : (monthInfo.status || card.status) === 'Concluído';
+      await auditLog({
+        user: currentUser?.name || "Desconhecido",
+        action: "Deletou",
+        target: card.title,
+        details: `Atividade removida do controle a partir de ${selectedMonth}`,
+        timestamp: Date.now(),
+      });
+      closeModal();
+    }
+  };
 
-                return {
-                    ...card,
-                    title,
-                    team,
-                    equipment: equipment as EquipmentGroup,
-                    status: (isActuallyCompleted ? 'Concluído' : 'Pendente') as Status,
-                    notes: monthInfo.notes || card.notes,
-                    subTasks: subTasks.map(st => ({
-                        ...st,
-                        status: (st.status || 'Pendente') as Status
-                    }))
-                } as Card;
-            });
-    }, [cards, monthlyData, selectedMonth, activeWorkspace?.type]);
+  const handleDeleteMessage = async (id: string) => {
+    if (window.confirm("Excluir este aviso para todos?")) {
+      await deleteMessage(id);
+    }
+  };
 
-    // Filtering logic
-    const filteredCards = useMemo(() => {
-        return mergedCards.filter(card => {
-            const matchesSearch = card.title.toLowerCase().includes(searchQuery.toLowerCase());
-            const matchesStatus = statusFilter === 'Todos' || (
-                statusFilter === 'Pendentes' ? card.status !== 'Concluído' : card.status === 'Concluído'
-            );
-            const matchesTeam = teamFilter === 'Todos' || card.team === teamFilter;
-            const matchesEquip = equipmentFilter === 'Todos' || card.equipment === equipmentFilter;
+  const handleSendMessage = async (text: string) => {
+    if (!text.trim() || !currentUser) return;
 
-            return matchesSearch && matchesStatus && matchesTeam && matchesEquip;
-        });
-    }, [mergedCards, searchQuery, statusFilter, teamFilter, equipmentFilter]);
+    // Optimistic Update
+    const tempId = Math.random().toString(36).substring(7);
+    const newMessage: Message = {
+      id: tempId,
+      text: text.trim(),
+      userName: currentUser.name,
+      createdAt: Date.now(),
+      workspaceId: activeWorkspaceId,
+      month: selectedMonth,
+    };
 
-    // --- Actions ---
-    const handleToggleStatus = async (cardId: string, currentStatus: string) => {
-        const newStatus = currentStatus === 'Concluído' ? 'Pendente' : 'Concluído';
-        const card = cards.find(c => c.id === cardId);
-        if (!card) return;
+    // Update local state immediately
+    setMessages((prev) => [newMessage, ...prev]);
 
-        await updateMonthlyCardData(selectedMonth, cardId, { status: newStatus });
+    try {
+      await addMessage(
+        activeWorkspaceId,
+        text.trim(),
+        currentUser.name,
+        selectedMonth,
+      );
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      // Revert optimistic update on error
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      alert("Erro ao enviar mensagem. Tente novamente.");
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    // --- SUBTASK DRAG-AND-DROP LOGIC ---
+    // Find if the dragged item is a subtask
+    const parentCardWithSubTask = cards.find((c) =>
+      c.subTasks?.some((st) => st.id === activeId),
+    );
+
+    if (parentCardWithSubTask) {
+      const subTasks = [...(parentCardWithSubTask.subTasks || [])];
+      const activeIndex = subTasks.findIndex((st) => st.id === activeId);
+      const overIndex = subTasks.findIndex((st) => st.id === overId);
+
+      if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
+        const newSubTasks = arrayMove(subTasks, activeIndex, overIndex);
+
+        // Persistence
+        const currentMonthly =
+          (monthlyData[selectedMonth] &&
+            monthlyData[selectedMonth][parentCardWithSubTask.id]) ||
+          {};
+
+        if (currentMonthly.overrides) {
+          // Update overrides
+          await updateMonthlyCardData(selectedMonth, parentCardWithSubTask.id, {
+            overrides: {
+              ...currentMonthly.overrides,
+              subTasks: newSubTasks.map((st) => ({
+                id: st.id,
+                title: st.title,
+                status: st.status,
+              })),
+            },
+          });
+        } else {
+          // Update base card
+          await upsertCardBase({
+            ...parentCardWithSubTask,
+            subTasks: newSubTasks,
+          });
+        }
 
         await auditLog({
-            user: currentUser?.name || 'Desconhecido',
-            action: 'Concluiu',
-            target: card.title,
-            details: `Status alterado para ${newStatus} no mês ${selectedMonth}`,
-            timestamp: Date.now()
+          user: currentUser?.name || "Desconhecido",
+          action: "Reordenou",
+          target: parentCardWithSubTask.title,
+          details: `Reordenou subtarefas no mês ${selectedMonth}`,
+          timestamp: Date.now(),
         });
+      }
+      return; // Subtask logic finished
+    }
 
-        if (newStatus === 'Concluído') {
-            confetti({
-                particleCount: 150,
-                spread: 70,
-                origin: { y: 0.6 },
-                colors: ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
-            });
-        }
-    };
+    // --- CARD DRAG-AND-DROP LOGIC (Original) ---
+    const activeCard = cards.find((c) => c.id === activeId);
+    if (!activeCard) return;
 
-    const handleToggleSubTask = async (cardId: string, subTaskId: string, currentStatus: string) => {
-        const newStatus = currentStatus === 'Concluído' ? 'Pendente' : 'Concluído';
-        const card = cards.find(c => c.id === cardId);
-        if (!card) return;
+    // Extract target container/card details
+    let targetTeam = activeCard.team;
+    let targetEquip = activeCard.equipment;
+    let isReordering = false;
 
-        const currentMonthly = (monthlyData[selectedMonth] && monthlyData[selectedMonth][cardId]) || {};
-        const subTasksStatuses = { ...(currentMonthly.subTasksStatuses || {}) };
-        subTasksStatuses[subTaskId] = newStatus;
+    // Case 1: Dragging over a Column container (id format: "Team-Equip")
+    if (overId.includes("-")) {
+      const [teamPart, equipPart] = overId.split("-");
+      if (AVAILABLE_TEAMS.includes(teamPart as Team)) {
+        targetTeam = teamPart as Team;
+        targetEquip = equipPart as EquipmentGroup;
+      }
+    }
+    // Case 2: Dragging over another card
+    else {
+      const overCard = cards.find((c) => c.id === overId);
+      if (overCard) {
+        targetTeam = overCard.team;
+        targetEquip = overCard.equipment;
+        isReordering = true;
+      }
+    }
 
-        await updateMonthlyCardData(selectedMonth, cardId, { subTasksStatuses });
+    // Determine the cards within the target group
+    const targetGroupCards = [...cards]
+      .filter((c) => c.team === targetTeam && c.equipment === targetEquip)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
 
-        if (newStatus === 'Concluído') {
-            // Check if ALL subtasks are now completed
-            const dbCard = cards.find(c => c.id === cardId) || card;
-            const updatedMonthly = (monthlyData[selectedMonth] && monthlyData[selectedMonth][cardId]) || {};
-            const finalSubTasksStatuses = { ...(updatedMonthly.subTasksStatuses || {}), [subTaskId]: newStatus };
+    let newCardsForGroup = [...targetGroupCards];
 
-            const totalSubTasks = dbCard.subTasks?.length || 0;
-            const completedSubTasks = dbCard.subTasks?.filter(st => {
-                const mst = finalSubTasksStatuses[st.id];
-                return mst !== undefined ? mst === 'Concluído' : st.status === 'Concluído';
-            }).length || 0;
+    if (isReordering) {
+      const overIndexInGroup = targetGroupCards.findIndex(
+        (c) => c.id === overId,
+      );
+      const activeIndexInGroup = targetGroupCards.findIndex(
+        (c) => c.id === activeId,
+      );
 
-            if (totalSubTasks > 0 && completedSubTasks === totalSubTasks) {
-                // ALL subtasks completed, big confetti!
-                confetti({
-                    particleCount: 200,
-                    spread: 100,
-                    origin: { y: 0.6 },
-                    colors: ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
-                    zIndex: 9999
-                });
-            } else {
-                // Small confetti for single subtask
-                confetti({
-                    particleCount: 50,
-                    spread: 40,
-                    origin: { y: 0.7 },
-                    zIndex: 9999
-                });
-            }
-        }
-    };
-
-    const upsertCard = async (card: Card) => {
-        const safeCard = {
-            ...card,
-            activeFrom: card.activeFrom || selectedMonth
-        };
-        await upsertCardBase(safeCard);
-    };
-
-    const handleSaveCard = async (data: Partial<Card>) => {
-        if (editingCard && 'id' in editingCard) {
-            const subTasksChanged = (data.subTasks?.length !== editingCard.subTasks?.length) ||
-                (JSON.stringify(data.subTasks?.map(s => s.title)) !== JSON.stringify(editingCard.subTasks?.map(s => s.title)));
-
-            const hasStructuralChanges = (data.title && data.title !== editingCard.title) ||
-                (data.team && data.team !== editingCard.team) ||
-                (data.equipment && data.equipment !== editingCard.equipment) ||
-                (data.isMultiTask !== undefined && data.isMultiTask !== editingCard.isMultiTask) ||
-                subTasksChanged;
-
-            const updateData: Record<string, any> = { // eslint-disable-line @typescript-eslint/no-explicit-any
-                notes: data.notes || ''
-            };
-
-            if (hasStructuralChanges) {
-                updateData.overrides = {
-                    title: data.title,
-                    team: data.team,
-                    equipment: data.equipment,
-                    isMultiTask: data.isMultiTask,
-                    subTasks: data.subTasks?.map(st => ({
-                        id: st.id,
-                        title: st.title,
-                        status: 'Pendente'
-                    }))
-                };
-            }
-
-            if (editingCard?.id) {
-                await updateMonthlyCardData(selectedMonth, editingCard.id, updateData);
-
-                if (hasStructuralChanges) {
-                    await auditLog({
-                        user: currentUser?.name || 'Desconhecido',
-                        action: 'Editou',
-                        target: data.title || editingCard.title || 'Atividade',
-                        details: `Alterou propriedades no mês ${selectedMonth}.`,
-                        timestamp: Date.now()
-                    });
-                }
-            }
-        } else {
-            if (!activeWorkspaceId) return;
-            const cardId = Math.random().toString(36).substr(2, 9);
-            const isListWorkspace = activeWorkspace?.type === 'list';
-
-            const newCard: Card = {
-                id: cardId,
-                workspaceId: activeWorkspaceId as string,
-                title: data.title || 'Nova Atividade',
-                equipment: (data.equipment || (AVAILABLE_SECTORS[0] || 'Geral')) as EquipmentGroup,
-                team: (data.team || (AVAILABLE_TEAMS[0] || 'Time')) as Team,
-                status: 'Pendente',
-                order: cards.length,
-                isMultiTask: data.isMultiTask || false,
-                subTasks: data.subTasks || [],
-                notes: data.notes || '',
-                activeFrom: selectedMonth,
-                activeUntil: isListWorkspace ? getNextMonth(selectedMonth) : null,
-                createdAt: Date.now()
-            };
-
-            await upsertCard(newCard);
-
-            await auditLog({
-                user: currentUser?.name || 'Desconhecido',
-                action: 'Criou',
-                target: newCard.title,
-                details: `Atividade criada no controle de ${selectedMonth}`,
-                timestamp: Date.now()
-            });
-        }
-        closeModal();
-    };
-
-    const handleDeleteCard = async (id: string) => {
-        const card = cards.find(c => c.id === id);
-        if (!card) return;
-
-        if (window.confirm(`Tem certeza que deseja remover "${card.title}" a partir de ${selectedMonth}? (O histórico de meses anteriores será preservado)`)) {
-            await upsertCard({ ...card, activeUntil: selectedMonth });
-
-            await auditLog({
-                user: currentUser?.name || 'Desconhecido',
-                action: 'Deletou',
-                target: card.title,
-                details: `Atividade removida do controle a partir de ${selectedMonth}`,
-                timestamp: Date.now()
-            });
-            closeModal();
-        }
-    };
-
-    const handleDeleteMessage = async (id: string) => {
-        if (window.confirm('Excluir este aviso para todos?')) {
-            await deleteMessage(id);
-        }
-    };
-
-    const handleSendMessage = async (text: string) => {
-        if (!text.trim() || !currentUser) return;
-
-        // Optimistic Update
-        const tempId = Math.random().toString(36).substring(7);
-        const newMessage: Message = {
-            id: tempId,
-            text: text.trim(),
-            userName: currentUser.name,
-            createdAt: Date.now(),
-            workspaceId: activeWorkspaceId,
-            month: selectedMonth
-        };
-
-        // Update local state immediately
-        setMessages(prev => [newMessage, ...prev]);
-
-        try {
-            await addMessage(activeWorkspaceId, text.trim(), currentUser.name, selectedMonth);
-        } catch (error) {
-            console.error("Failed to send message:", error);
-            // Revert optimistic update on error
-            setMessages(prev => prev.filter(m => m.id !== tempId));
-            alert("Erro ao enviar mensagem. Tente novamente.");
-        }
-    };
-
-    const handleDragEnd = async (event: DragEndEvent) => {
-        const { active, over } = event;
-        if (!over) return;
-
-        const activeId = active.id as string;
-        const overId = over.id as string;
-
-        // --- SUBTASK DRAG-AND-DROP LOGIC ---
-        // Find if the dragged item is a subtask
-        const parentCardWithSubTask = cards.find(c =>
-            c.subTasks?.some(st => st.id === activeId)
+      if (activeIndexInGroup !== -1) {
+        // Moving within same group
+        newCardsForGroup = arrayMove(
+          targetGroupCards,
+          activeIndexInGroup,
+          overIndexInGroup,
         );
+      } else {
+        // Moving to a new group at a specific position
+        activeCard.team = targetTeam;
+        activeCard.equipment = targetEquip;
+        newCardsForGroup.splice(overIndexInGroup, 0, activeCard);
+      }
+    } else {
+      // Drop in empty area of column - append to end if not already there or different group
+      if (
+        activeCard.team !== targetTeam ||
+        activeCard.equipment !== targetEquip
+      ) {
+        activeCard.team = targetTeam;
+        activeCard.equipment = targetEquip;
+        newCardsForGroup.push(activeCard);
+      }
+    }
 
-        if (parentCardWithSubTask) {
-            const subTasks = [...(parentCardWithSubTask.subTasks || [])];
-            const activeIndex = subTasks.findIndex(st => st.id === activeId);
-            const overIndex = subTasks.findIndex(st => st.id === overId);
+    // Persistence: Re-index orders for the entire target group to ensure consistency
+    const updatePromises = newCardsForGroup.map((card, index) => {
+      const updatedCard = { ...card, order: index };
+      return upsertCardBase(updatedCard);
+    });
 
-            if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
-                const newSubTasks = arrayMove(subTasks, activeIndex, overIndex);
+    await Promise.all(updatePromises);
 
-                // Persistence
-                const currentMonthly = (monthlyData[selectedMonth] && monthlyData[selectedMonth][parentCardWithSubTask.id]) || {};
+    // Audit logs
+    const teamChanged = activeCard.team !== targetTeam;
+    const equipChanged = activeCard.equipment !== targetEquip;
 
-                if (currentMonthly.overrides) {
-                    // Update overrides
-                    await updateMonthlyCardData(selectedMonth, parentCardWithSubTask.id, {
-                        overrides: {
-                            ...currentMonthly.overrides,
-                            subTasks: newSubTasks.map(st => ({
-                                id: st.id,
-                                title: st.title,
-                                status: st.status
-                            }))
-                        }
-                    });
-                } else {
-                    // Update base card
-                    await upsertCardBase({
-                        ...parentCardWithSubTask,
-                        subTasks: newSubTasks
-                    });
-                }
+    if (teamChanged || equipChanged) {
+      await auditLog({
+        user: currentUser?.name || "Desconhecido",
+        action: "Moveu",
+        target: activeCard.title,
+        details: `Movido para ${targetTeam} (${targetEquip}) no mês ${selectedMonth}`,
+        timestamp: Date.now(),
+      });
+    }
+  };
 
-                await auditLog({
-                    user: currentUser?.name || 'Desconhecido',
-                    action: 'Reordenou',
-                    target: parentCardWithSubTask.title,
-                    details: `Reordenou subtarefas no mês ${selectedMonth}`,
-                    timestamp: Date.now()
-                });
-            }
-            return; // Subtask logic finished
-        }
+  const toggleTeam = (team: string) => {
+    setExpandedTeams((prev) => ({ ...prev, [team]: !prev[team] }));
+  };
 
-        // --- CARD DRAG-AND-DROP LOGIC (Original) ---
-        const activeCard = cards.find(c => c.id === activeId);
-        if (!activeCard) return;
+  const isAdmin = currentUser?.role === "admin";
 
-        // Extract target container/card details
-        let targetTeam = activeCard.team;
-        let targetEquip = activeCard.equipment;
-        let isReordering = false;
+  return (
+    <div className="flex flex-col h-[calc(100vh-72px)] overflow-hidden bg-slate-50">
+      {/* Gráficos Reintroduzidos */}
+      <Dashboards
+        cards={mergedCards}
+        sectors={AVAILABLE_SECTORS}
+        teams={AVAILABLE_TEAMS}
+      />
 
-        // Case 1: Dragging over a Column container (id format: "Team-Equip")
-        if (overId.includes('-')) {
-            const [teamPart, equipPart] = overId.split('-');
-            if (AVAILABLE_TEAMS.includes(teamPart as Team)) {
-                targetTeam = teamPart as Team;
-                targetEquip = equipPart as EquipmentGroup;
-            }
-        }
-        // Case 2: Dragging over another card
-        else {
-            const overCard = cards.find(c => c.id === overId);
-            if (overCard) {
-                targetTeam = overCard.team;
-                targetEquip = overCard.equipment;
-                isReordering = true;
-            }
-        }
+      <div className="flex flex-1 overflow-x-auto gap-8 px-8 pb-10 scrollbar-hide">
+        <DndContext
+          collisionDetection={closestCorners}
+          onDragEnd={handleDragEnd}
+        >
+          {AVAILABLE_TEAMS.map((team) => {
+            const teamCards = filteredCards.filter((c) => c.team === team);
+            const total = teamCards.length;
+            const completed = teamCards.filter(
+              (c) => c.status === "Concluído",
+            ).length;
+            const progress = total > 0 ? (completed / total) * 100 : 0;
+            const isExpanded = expandedTeams[team];
+            const config = getTeamConfig(team, AVAILABLE_TEAMS);
 
-        // Determine the cards within the target group
-        const targetGroupCards = [...cards]
-            .filter(c => c.team === targetTeam && c.equipment === targetEquip)
-            .sort((a, b) => (a.order || 0) - (b.order || 0));
+            return (
+              <div
+                key={team}
+                className={`flex flex-col h-fit transition-all duration-500 ease-in-out ${isExpanded ? "min-w-[380px] flex-1" : "min-w-[80px] w-[80px]"}`}
+              >
+                <button
+                  onClick={() => toggleTeam(team)}
+                  className={`relative overflow-hidden flex items-center h-14 mb-4 rounded-2xl transition-all duration-300 ${isExpanded ? `${config.headerBg} shadow-lg shadow-blue-500/10` : `bg-white border border-slate-200`}`}
+                >
+                  {isExpanded ? (
+                    <div className="flex items-center justify-between w-full px-5 text-white">
+                      <div className="flex items-center gap-3">
+                        <div className="p-1.5 bg-white/20 rounded-lg">
+                          <ChevronDown size={18} strokeWidth={3} />
+                        </div>
+                        <span className="font-black text-sm uppercase tracking-widest">
+                          {team}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-black opacity-80 uppercase">
+                          {completed}/{total}
+                        </span>
+                        <div className="w-12 h-1.5 bg-white/20 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-white transition-all duration-500"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center w-full gap-2">
+                      <ChevronRight size={20} className="text-slate-400" />
+                      <div
+                        className={`w-2 h-2 rounded-full ${config.progressColor}`}
+                      />
+                    </div>
+                  )}
+                </button>
 
-        let newCardsForGroup = [...targetGroupCards];
-
-        if (isReordering) {
-            const overIndexInGroup = targetGroupCards.findIndex(c => c.id === overId);
-            const activeIndexInGroup = targetGroupCards.findIndex(c => c.id === activeId);
-
-            if (activeIndexInGroup !== -1) {
-                // Moving within same group
-                newCardsForGroup = arrayMove(targetGroupCards, activeIndexInGroup, overIndexInGroup);
-            } else {
-                // Moving to a new group at a specific position
-                activeCard.team = targetTeam;
-                activeCard.equipment = targetEquip;
-                newCardsForGroup.splice(overIndexInGroup, 0, activeCard);
-            }
-        } else {
-            // Drop in empty area of column - append to end if not already there or different group
-            if (activeCard.team !== targetTeam || activeCard.equipment !== targetEquip) {
-                activeCard.team = targetTeam;
-                activeCard.equipment = targetEquip;
-                newCardsForGroup.push(activeCard);
-            }
-        }
-
-        // Persistence: Re-index orders for the entire target group to ensure consistency
-        const updatePromises = newCardsForGroup.map((card, index) => {
-            const updatedCard = { ...card, order: index };
-            return upsertCardBase(updatedCard);
-        });
-
-        await Promise.all(updatePromises);
-
-        // Audit logs
-        const teamChanged = activeCard.team !== targetTeam;
-        const equipChanged = activeCard.equipment !== targetEquip;
-
-        if (teamChanged || equipChanged) {
-            await auditLog({
-                user: currentUser?.name || 'Desconhecido',
-                action: 'Moveu',
-                target: activeCard.title,
-                details: `Movido para ${targetTeam} (${targetEquip}) no mês ${selectedMonth}`,
-                timestamp: Date.now()
-            });
-        }
-    };
-
-    const toggleTeam = (team: string) => {
-        setExpandedTeams(prev => ({ ...prev, [team]: !prev[team] }));
-    };
-
-    const isAdmin = currentUser?.role === 'admin';
-
-    return (
-        <div className="flex flex-col h-[calc(100vh-72px)] overflow-hidden bg-slate-50">
-            {/* Gráficos Reintroduzidos */}
-            <Dashboards
-                cards={mergedCards}
-                sectors={AVAILABLE_SECTORS}
-                teams={AVAILABLE_TEAMS}
-            />
-
-            <div className="flex flex-1 overflow-x-auto gap-8 px-8 pb-10 scrollbar-hide">
-                <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-                    {AVAILABLE_TEAMS.map(team => {
-                        const teamCards = filteredCards.filter(c => c.team === team);
-                        const total = teamCards.length;
-                        const completed = teamCards.filter(c => c.status === 'Concluído').length;
-                        const progress = total > 0 ? (completed / total) * 100 : 0;
-                        const isExpanded = expandedTeams[team];
-                        const config = getTeamConfig(team, AVAILABLE_TEAMS);
-
-                        return (
-                            <div key={team} className={`flex flex-col h-fit transition-all duration-500 ease-in-out ${isExpanded ? 'min-w-[380px] flex-1' : 'min-w-[80px] w-[80px]'}`}>
-                                <button
-                                    onClick={() => toggleTeam(team)}
-                                    className={`relative overflow-hidden flex items-center h-14 mb-4 rounded-2xl transition-all duration-300 ${isExpanded ? `${config.headerBg} shadow-lg shadow-blue-500/10` : `bg-white border border-slate-200`}`}
-                                >
-                                    {isExpanded ? (
-                                        <div className="flex items-center justify-between w-full px-5 text-white">
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-1.5 bg-white/20 rounded-lg">
-                                                    <ChevronDown size={18} strokeWidth={3} />
-                                                </div>
-                                                <span className="font-black text-sm uppercase tracking-widest">{team}</span>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-[10px] font-black opacity-80 uppercase">{completed}/{total}</span>
-                                                <div className="w-12 h-1.5 bg-white/20 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-white transition-all duration-500" style={{ width: `${progress}%` }} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center w-full gap-2">
-                                            <ChevronRight size={20} className="text-slate-400" />
-                                            <div className={`w-2 h-2 rounded-full ${config.progressColor}`} />
-                                        </div>
-                                    )}
-                                </button>
-
-                                <div className={`${isExpanded ? `${config.lightBg} border border-slate-100 p-4 rounded-[2rem] min-h-[500px] shadow-sm` : 'opacity-0 h-0 pointer-events-none'}`}>
-                                    <div className="flex flex-col gap-8">
-                                        {AVAILABLE_SECTORS.length > 0 ? (
-                                            displayedSectors.map(equip => {
-                                                const sectorCards = teamCards.filter(c => c.equipment === equip);
-                                                return (
-                                                    <div key={equip} className="space-y-4">
-                                                        <div className="flex items-center justify-between px-2">
-                                                            <div className="flex items-center gap-2">
-                                                                <div className={`w-1 h-4 rounded-full ${config.progressColor}`} />
-                                                                <h3 className={`text-[11px] font-black uppercase tracking-widest ${config.accentText}`}>{equip}</h3>
-                                                            </div>
-                                                            <span className="text-[10px] font-bold text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-100">
-                                                                {sectorCards.length}
-                                                            </span>
-                                                        </div>
-
-                                                        <KanbanColumn id={`${team}-${equip}`} team={team} cards={sectorCards}>
-                                                            <div className="flex flex-col gap-3 min-h-[20px]">
-                                                                {sectorCards.map(card => (
-                                                                    <SortableCardItem
-                                                                        key={card.id}
-                                                                        card={card}
-                                                                        openEditCard={openEditCard}
-                                                                        onToggleStatus={handleToggleStatus}
-                                                                        onToggleSubTask={handleToggleSubTask}
-                                                                    />
-                                                                ))}
-                                                            </div>
-
-                                                            {/* Botão de Adicionar Contextual */}
-                                                            <button
-                                                                onClick={() => openNewCard({ team, equipment: equip })}
-                                                                className="mt-3 w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-300 hover:text-blue-500 hover:border-blue-200 hover:bg-white transition-all flex items-center justify-center gap-2 group"
-                                                            >
-                                                                <Plus size={16} className="group-hover:scale-110" />
-                                                                <span className="text-[10px] font-black uppercase tracking-widest">Novo Item no Setor</span>
-                                                            </button>
-                                                        </KanbanColumn>
-                                                    </div>
-                                                );
-                                            })
-                                        ) : (
-                                            <div className="space-y-4">
-                                                <KanbanColumn id={`${team}-Geral`} team={team} cards={teamCards}>
-                                                    <div className="flex flex-col gap-3 min-h-[20px]">
-                                                        {teamCards.map(card => (
-                                                            <SortableCardItem
-                                                                key={card.id}
-                                                                card={card}
-                                                                openEditCard={openEditCard}
-                                                                onToggleStatus={handleToggleStatus}
-                                                                onToggleSubTask={handleToggleSubTask}
-                                                            />
-                                                        ))}
-                                                    </div>
-                                                    <button
-                                                        onClick={() => openNewCard({ team, equipment: 'Geral' })}
-                                                        className="mt-3 w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-300 hover:text-blue-500 hover:border-blue-200 hover:bg-white transition-all flex items-center justify-center gap-2 group"
-                                                    >
-                                                        <Plus size={16} className="group-hover:scale-110" />
-                                                        <span className="text-[10px] font-black uppercase tracking-widest">Novo Item no Setor</span>
-                                                    </button>
-                                                </KanbanColumn>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
+                <div
+                  className={`${isExpanded ? `${config.lightBg} border border-slate-100 p-4 rounded-[2rem] min-h-[500px] shadow-sm` : "opacity-0 h-0 pointer-events-none"}`}
+                >
+                  <div className="flex flex-col gap-8">
+                    {AVAILABLE_SECTORS.length > 0 ? (
+                      displayedSectors.map((equip) => {
+                        const sectorCards = teamCards.filter(
+                          (c) => c.equipment === equip,
                         );
-                    })}
-                </DndContext>
-
-                {/* Mural de Recados Retrátil */}
-                <div className={`transition-all duration-500 ease-in-out bg-white border border-slate-200 rounded-[2.5rem] shadow-xl flex flex-col overflow-hidden mb-4 ${isMuralExpanded ? 'min-w-[320px] w-[320px]' : 'min-w-[80px] w-[80px]'}`}>
-                    <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between cursor-pointer" onClick={() => setIsMuralExpanded(!isMuralExpanded)}>
-                        {isMuralExpanded ? (
-                            <>
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-blue-600 rounded-xl shadow-lg shadow-blue-500/10 text-white"><MessageSquare size={18} /></div>
-                                    <span className="font-black text-sm uppercase tracking-widest text-slate-800">Mural</span>
-                                </div>
-                                <ChevronRight size={18} className="text-slate-400 rotate-180" />
-                            </>
-                        ) : (
-                            <div className="w-full flex flex-col items-center gap-4">
-                                <div className="p-2 bg-slate-100 rounded-xl text-slate-400"><MessageSquare size={18} /></div>
-                                <ChevronLeft size={18} className="text-slate-400" />
-                            </div>
-                        )}
-                    </div>
-
-                    {isMuralExpanded && (
-                        <>
-                            <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 scrollbar-hide animate-in fade-in slide-in-from-right-4 duration-300">
-                                {messages.length === 0 ? (
-                                    <div className="flex-1 flex flex-col items-center justify-center text-slate-300 italic py-20 text-center">
-                                        <MessageSquare size={40} className="mb-2 opacity-10" />
-                                        <p className="text-xs font-bold uppercase tracking-widest opacity-40">Sem avisos</p>
-                                    </div>
-                                ) : (
-                                    messages.map((msg) => (
-                                        <div key={msg.id} className="relative bg-slate-50 p-4 rounded-2xl border border-slate-100 group/msg">
-                                            <p className="text-sm font-medium text-slate-700 leading-relaxed pr-6">{msg.text}</p>
-                                            <div className="flex items-center justify-between mt-2">
-                                                <span className="text-[10px] font-black text-blue-600 uppercase">{msg.userName}</span>
-                                                <span className="text-[9px] font-bold text-slate-300">{new Date(msg.createdAt).toLocaleDateString()}</span>
-                                            </div>
-                                            {isAdmin && (
-                                                <button
-                                                    onClick={() => handleDeleteMessage(msg.id)}
-                                                    className="absolute top-3 right-3 p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover/msg:opacity-100 transition-all rounded-lg"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            )}
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                            <div className="p-6 bg-slate-50 border-t border-slate-100">
-                                <input
-                                    type="text"
-                                    placeholder="Postar no mural..."
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            handleSendMessage((e.target as HTMLInputElement).value);
-                                            (e.target as HTMLInputElement).value = '';
-                                        }
-                                    }}
-                                    className="w-full bg-white border border-slate-200 rounded-2xl py-3 px-4 text-sm font-bold focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                        return (
+                          <div key={equip} className="space-y-4">
+                            <div className="flex items-center justify-between px-2">
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className={`w-1 h-4 rounded-full ${config.progressColor}`}
                                 />
+                                <h3
+                                  className={`text-[11px] font-black uppercase tracking-widest ${config.accentText}`}
+                                >
+                                  {equip}
+                                </h3>
+                              </div>
+                              <span className="text-[10px] font-bold text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-100">
+                                {sectorCards.length}
+                              </span>
                             </div>
-                        </>
-                    )}
-                </div>
-            </div>
 
-            {/* Barra de Busca e Filtro de Equipamento (WELL VISIBLE) */}
-            <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900 shadow-2xl px-6 py-2 rounded-2xl flex items-center gap-6 border border-white/10 z-[100] backdrop-blur-md">
-                {/* Search */}
-                <div className="flex items-center gap-3 border-r border-white/10 pr-6">
-                    <Search size={18} className="text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="Buscar..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="bg-transparent text-white text-sm font-bold placeholder:text-slate-600 border-none focus:ring-0 w-32 focus:w-48 transition-all"
-                    />
-                </div>
-
-                {/* Equipment Filter Pills */}
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 text-white/40 mr-2 border-r border-white/5 pr-4">
-                        <Filter size={14} />
-                        <span className="text-[10px] font-black uppercase tracking-tighter">Equipamento</span>
-                    </div>
-                    <div className="flex gap-1.5">
-                        <button
-                            onClick={() => setEquipmentFilter('Todos')}
-                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${equipmentFilter === 'Todos' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/40' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
-                        >
-                            Todos
-                        </button>
-                        {AVAILABLE_SECTORS.map(eq => (
-                            <button
-                                key={eq}
-                                onClick={() => setEquipmentFilter(eq)}
-                                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${equipmentFilter === eq ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/40' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+                            <KanbanColumn
+                              id={`${team}-${equip}`}
+                              team={team}
+                              cards={sectorCards}
                             >
-                                {eq}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </div>
+                              <div className="flex flex-col gap-3 min-h-[20px]">
+                                {sectorCards.map((card) => (
+                                  <SortableCardItem
+                                    key={card.id}
+                                    card={card}
+                                    openEditCard={openEditCard}
+                                    onToggleStatus={handleToggleStatus}
+                                    onToggleSubTask={handleToggleSubTask}
+                                  />
+                                ))}
+                              </div>
 
-            <CardModal
-                key={editingCard?.id || 'new'}
-                isOpen={isOpen}
-                onClose={closeModal}
-                card={editingCard}
-                onSave={handleSaveCard}
-                onDelete={handleDeleteCard}
-                availableEquipments={AVAILABLE_SECTORS}
-                availableTeams={AVAILABLE_TEAMS}
-            />
+                              {/* Botão de Adicionar Contextual */}
+                              <button
+                                onClick={() =>
+                                  openNewCard({ team, equipment: equip })
+                                }
+                                className="mt-3 w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-300 hover:text-blue-500 hover:border-blue-200 hover:bg-white transition-all flex items-center justify-center gap-2 group"
+                              >
+                                <Plus
+                                  size={16}
+                                  className="group-hover:scale-110"
+                                />
+                                <span className="text-[10px] font-black uppercase tracking-widest">
+                                  Novo Item no Setor
+                                </span>
+                              </button>
+                            </KanbanColumn>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="space-y-4">
+                        <KanbanColumn
+                          id={`${team}-Geral`}
+                          team={team}
+                          cards={teamCards}
+                        >
+                          <div className="flex flex-col gap-3 min-h-[20px]">
+                            {teamCards.map((card) => (
+                              <SortableCardItem
+                                key={card.id}
+                                card={card}
+                                openEditCard={openEditCard}
+                                onToggleStatus={handleToggleStatus}
+                                onToggleSubTask={handleToggleSubTask}
+                              />
+                            ))}
+                          </div>
+                          <button
+                            onClick={() =>
+                              openNewCard({ team, equipment: "Geral" })
+                            }
+                            className="mt-3 w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-300 hover:text-blue-500 hover:border-blue-200 hover:bg-white transition-all flex items-center justify-center gap-2 group"
+                          >
+                            <Plus size={16} className="group-hover:scale-110" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">
+                              Novo Item no Setor
+                            </span>
+                          </button>
+                        </KanbanColumn>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </DndContext>
+
+        {/* Mural de Recados Retrátil */}
+        <div
+          className={`transition-all duration-500 ease-in-out bg-white border border-slate-200 rounded-[2.5rem] shadow-xl flex flex-col overflow-hidden mb-4 ${isMuralExpanded ? "min-w-[320px] w-[320px]" : "min-w-[80px] w-[80px]"}`}
+        >
+          <div
+            className="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between cursor-pointer"
+            onClick={() => setIsMuralExpanded(!isMuralExpanded)}
+          >
+            {isMuralExpanded ? (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-600 rounded-xl shadow-lg shadow-blue-500/10 text-white">
+                    <MessageSquare size={18} />
+                  </div>
+                  <span className="font-black text-sm uppercase tracking-widest text-slate-800">
+                    Mural
+                  </span>
+                </div>
+                <ChevronRight size={18} className="text-slate-400 rotate-180" />
+              </>
+            ) : (
+              <div className="w-full flex flex-col items-center gap-4">
+                <div className="p-2 bg-slate-100 rounded-xl text-slate-400">
+                  <MessageSquare size={18} />
+                </div>
+                <ChevronLeft size={18} className="text-slate-400" />
+              </div>
+            )}
+          </div>
+
+          {isMuralExpanded && (
+            <>
+              <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 scrollbar-hide animate-in fade-in slide-in-from-right-4 duration-300">
+                {messages.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center text-slate-300 italic py-20 text-center">
+                    <MessageSquare size={40} className="mb-2 opacity-10" />
+                    <p className="text-xs font-bold uppercase tracking-widest opacity-40">
+                      Sem avisos
+                    </p>
+                  </div>
+                ) : (
+                  messages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className="relative bg-slate-50 p-4 rounded-2xl border border-slate-100 group/msg"
+                    >
+                      <p className="text-sm font-medium text-slate-700 leading-relaxed pr-6">
+                        {msg.text}
+                      </p>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-[10px] font-black text-blue-600 uppercase">
+                          {msg.userName}
+                        </span>
+                        <span className="text-[9px] font-bold text-slate-300">
+                          {new Date(msg.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDeleteMessage(msg.id)}
+                          className="absolute top-3 right-3 p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover/msg:opacity-100 transition-all rounded-lg"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="p-6 bg-slate-50 border-t border-slate-100">
+                <input
+                  type="text"
+                  placeholder="Postar no mural..."
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleSendMessage((e.target as HTMLInputElement).value);
+                      (e.target as HTMLInputElement).value = "";
+                    }
+                  }}
+                  className="w-full bg-white border border-slate-200 rounded-2xl py-3 px-4 text-sm font-bold focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                />
+              </div>
+            </>
+          )}
         </div>
-    );
+      </div>
+
+      {/* Barra de Busca e Filtro de Equipamento (WELL VISIBLE) */}
+      <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900 shadow-2xl px-6 py-2 rounded-2xl flex items-center gap-6 border border-white/10 z-[100] backdrop-blur-md">
+        {/* Search */}
+        <div className="flex items-center gap-3 border-r border-white/10 pr-6">
+          <Search size={18} className="text-slate-400" />
+          <input
+            type="text"
+            placeholder="Buscar..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-transparent text-white text-sm font-bold placeholder:text-slate-600 border-none focus:ring-0 w-32 focus:w-48 transition-all"
+          />
+        </div>
+
+        {/* Equipment Filter Pills */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 text-white/40 mr-2 border-r border-white/5 pr-4">
+            <Filter size={14} />
+            <span className="text-[10px] font-black uppercase tracking-tighter">
+              Equipamento
+            </span>
+          </div>
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => setEquipmentFilter("Todos")}
+              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${equipmentFilter === "Todos" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/40" : "text-slate-400 hover:text-slate-200 hover:bg-white/5"}`}
+            >
+              Todos
+            </button>
+            {AVAILABLE_SECTORS.map((eq) => (
+              <button
+                key={eq}
+                onClick={() => setEquipmentFilter(eq)}
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${equipmentFilter === eq ? "bg-blue-600 text-white shadow-lg shadow-blue-500/40" : "text-slate-400 hover:text-slate-200 hover:bg-white/5"}`}
+              >
+                {eq}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <CardModal
+        key={
+          isOpen
+            ? editingCard?.id ||
+              `new-${editingCard?.team}-${editingCard?.equipment}`
+            : "closed"
+        }
+        isOpen={isOpen}
+        onClose={closeModal}
+        card={editingCard}
+        onSave={handleSaveCard}
+        onDelete={handleDeleteCard}
+        availableEquipments={AVAILABLE_SECTORS}
+        availableTeams={AVAILABLE_TEAMS}
+      />
+    </div>
+  );
 }

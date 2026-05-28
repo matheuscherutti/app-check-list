@@ -126,50 +126,52 @@ export default function WorkspaceModal({ isOpen, onClose, onSave, workspace }: W
                         </div>
                     </div>
 
-                    <div className="grid md:grid-cols-2 gap-8">
+                    <div className={type === 'list' ? "space-y-4" : "grid md:grid-cols-2 gap-8"}>
                         {/* Sectors / Equipment Group */}
-                        <div className="space-y-4">
-                            <div>
-                                <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1 flex items-center gap-2">
-                                    Setores / Equipamentos
-                                    <span className="bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded text-[9px]">{sectors.length}</span>
-                                </h4>
-                                <div className="flex gap-2 mb-3">
-                                    <input
-                                        type="text"
-                                        value={newSector}
-                                        onChange={(e) => setNewSector(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSector())}
-                                        placeholder="Novo setor..."
-                                        className="flex-1 text-sm border-slate-200 rounded-xl px-4 py-2 focus:ring-blue-500 font-medium"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={addSector}
-                                        className="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
-                                    >
-                                        <Plus size={20} />
-                                    </button>
-                                </div>
-                                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                                    {sectors.map((s, idx) => (
-                                        <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl group transition-all hover:border-blue-200 hover:bg-blue-50/30">
-                                            <span className="text-sm font-bold text-slate-700">{s}</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => removeSector(idx)}
-                                                className="p-1 text-slate-300 hover:text-red-500 transition-colors"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    ))}
-                                    {sectors.length === 0 && (
-                                        <p className="text-center text-[11px] text-slate-400 py-4 italic border-2 border-dashed border-slate-100 rounded-xl uppercase tracking-wider font-black">Nenhum setor definido</p>
-                                    )}
+                        {type !== 'list' && (
+                            <div className="space-y-4">
+                                <div>
+                                    <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1 flex items-center gap-2">
+                                        Setores / Equipamentos
+                                        <span className="bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded text-[9px]">{sectors.length}</span>
+                                    </h4>
+                                    <div className="flex gap-2 mb-3">
+                                        <input
+                                            type="text"
+                                            value={newSector}
+                                            onChange={(e) => setNewSector(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSector())}
+                                            placeholder="Novo setor..."
+                                            className="flex-1 text-sm border-slate-200 rounded-xl px-4 py-2 focus:ring-blue-500 font-medium"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={addSector}
+                                            className="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
+                                        >
+                                            <Plus size={20} />
+                                        </button>
+                                    </div>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                        {sectors.map((s, idx) => (
+                                            <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl group transition-all hover:border-blue-200 hover:bg-blue-50/30">
+                                                <span className="text-sm font-bold text-slate-700">{s}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeSector(idx)}
+                                                    className="p-1 text-slate-300 hover:text-red-500 transition-colors"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {sectors.length === 0 && (
+                                            <p className="text-center text-[11px] text-slate-400 py-4 italic border-2 border-dashed border-slate-100 rounded-xl uppercase tracking-wider font-black">Nenhum setor definido</p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Teams */}
                         <div className="space-y-4">

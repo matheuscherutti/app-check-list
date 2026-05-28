@@ -10,6 +10,7 @@ interface CardModalProps {
     onSave: (data: Partial<Card>) => void;
     availableEquipments?: string[];
     availableTeams?: string[];
+    isListType?: boolean;
 }
 
 export default function CardModal({
@@ -19,12 +20,13 @@ export default function CardModal({
     onDelete,
     onSave,
     availableEquipments = [],
-    availableTeams = []
+    availableTeams = [],
+    isListType = false
 }: CardModalProps) {
     const isEditing = !!(card as Card)?.id;
 
     const [title, setTitle] = useState(card?.title || '');
-    const [equipment, setEquipment] = useState<EquipmentGroup>(card?.equipment || availableEquipments[0] || '');
+    const [equipment, setEquipment] = useState<EquipmentGroup>(card?.equipment || (isListType ? 'Geral' : (availableEquipments[0] || '')));
     const [team, setTeam] = useState<Team>(card?.team || availableTeams[0] || '');
 
     // Multi task state
@@ -62,7 +64,7 @@ export default function CardModal({
     const handleSave = () => {
         onSave({
             title,
-            equipment,
+            equipment: isListType ? (equipment || 'Geral') : equipment,
             team,
             isMultiTask,
             ...(isMultiTask ? { subTasks } : {}),
@@ -105,27 +107,29 @@ export default function CardModal({
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Setor / Equipamento</label>
-                                {availableEquipments.length > 0 ? (
-                                    <select
-                                        value={equipment}
-                                        onChange={(e) => setEquipment(e.target.value)}
-                                        className="w-full border-slate-200 rounded-xl p-3 text-sm font-bold bg-slate-50"
-                                    >
-                                        {availableEquipments.map(g => <option key={g} value={g}>{g}</option>)}
-                                    </select>
-                                ) : (
-                                    <input
-                                        type="text"
-                                        value={equipment}
-                                        onChange={(e) => setEquipment(e.target.value)}
-                                        className="w-full border-slate-200 rounded-xl p-3 text-sm font-bold focus:ring-primary-500"
-                                        placeholder="Defina o equipamento..."
-                                    />
-                                )}
-                            </div>
+                        <div className={isListType ? "space-y-4" : "grid grid-cols-2 gap-4"}>
+                            {!isListType && (
+                                <div>
+                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Setor / Equipamento</label>
+                                    {availableEquipments.length > 0 ? (
+                                        <select
+                                            value={equipment}
+                                            onChange={(e) => setEquipment(e.target.value)}
+                                            className="w-full border-slate-200 rounded-xl p-3 text-sm font-bold bg-slate-50"
+                                        >
+                                            {availableEquipments.map(g => <option key={g} value={g}>{g}</option>)}
+                                        </select>
+                                    ) : (
+                                        <input
+                                            type="text"
+                                            value={equipment}
+                                            onChange={(e) => setEquipment(e.target.value)}
+                                            className="w-full border-slate-200 rounded-xl p-3 text-sm font-bold focus:ring-primary-500"
+                                            placeholder="Defina o equipamento..."
+                                        />
+                                    )}
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Time / Equipe</label>
                                 {availableTeams.length > 0 ? (

@@ -107,6 +107,7 @@ export default function Board() {
   );
 
   const AVAILABLE_SECTORS = useMemo(() => {
+    if (activeWorkspace?.type === 'list') return [];
     if (activeWorkspace?.sectors && activeWorkspace.sectors.length > 0)
       return activeWorkspace.sectors;
     const discovered = Array.from(new Set(cards.map((c) => c.equipment)))
@@ -924,7 +925,7 @@ export default function Board() {
       {/* Barra de Busca e Filtro de Equipamento (WELL VISIBLE) */}
       <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900 shadow-2xl px-6 py-2 rounded-2xl flex items-center gap-6 border border-white/10 z-[100] backdrop-blur-md">
         {/* Search */}
-        <div className="flex items-center gap-3 border-r border-white/10 pr-6">
+        <div className={`flex items-center gap-3 ${activeWorkspace?.type !== 'list' ? 'border-r border-white/10 pr-6' : ''}`}>
           <Search size={18} className="text-slate-400" />
           <input
             type="text"
@@ -936,31 +937,33 @@ export default function Board() {
         </div>
 
         {/* Equipment Filter Pills */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 text-white/40 mr-2 border-r border-white/5 pr-4">
-            <Filter size={14} />
-            <span className="text-[10px] font-black uppercase tracking-tighter">
-              Equipamento
-            </span>
-          </div>
-          <div className="flex gap-1.5">
-            <button
-              onClick={() => setEquipmentFilter("Todos")}
-              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${equipmentFilter === "Todos" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/40" : "text-slate-400 hover:text-slate-200 hover:bg-white/5"}`}
-            >
-              Todos
-            </button>
-            {AVAILABLE_SECTORS.map((eq) => (
+        {activeWorkspace?.type !== 'list' && (
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 text-white/40 mr-2 border-r border-white/5 pr-4">
+              <Filter size={14} />
+              <span className="text-[10px] font-black uppercase tracking-tighter">
+                Equipamento
+              </span>
+            </div>
+            <div className="flex gap-1.5">
               <button
-                key={eq}
-                onClick={() => setEquipmentFilter(eq)}
-                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${equipmentFilter === eq ? "bg-blue-600 text-white shadow-lg shadow-blue-500/40" : "text-slate-400 hover:text-slate-200 hover:bg-white/5"}`}
+                onClick={() => setEquipmentFilter("Todos")}
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${equipmentFilter === "Todos" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/40" : "text-slate-400 hover:text-slate-200 hover:bg-white/5"}`}
               >
-                {eq}
+                Todos
               </button>
-            ))}
+              {AVAILABLE_SECTORS.map((eq) => (
+                <button
+                  key={eq}
+                  onClick={() => setEquipmentFilter(eq)}
+                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${equipmentFilter === eq ? "bg-blue-600 text-white shadow-lg shadow-blue-500/40" : "text-slate-400 hover:text-slate-200 hover:bg-white/5"}`}
+                >
+                  {eq}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <CardModal
@@ -977,6 +980,7 @@ export default function Board() {
         onDelete={handleDeleteCard}
         availableEquipments={AVAILABLE_SECTORS}
         availableTeams={AVAILABLE_TEAMS}
+        isListType={activeWorkspace?.type === 'list'}
       />
     </div>
   );

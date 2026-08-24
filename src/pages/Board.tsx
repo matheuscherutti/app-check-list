@@ -106,95 +106,6 @@ export default function Board() {
     {},
   );
 
-  const AVAILABLE_SECTORS = useMemo(() => {
-    if (activeWorkspace?.type === "list") return [];
-    const configured = activeWorkspace?.sectors || [];
-    const discovered = Array.from(new Set(cards.map((c) => c.equipment))).filter(Boolean);
-    const combined = Array.from(new Set([...configured, ...discovered]));
-    const result = configured.filter((s) => combined.includes(s));
-    discovered.forEach((d) => {
-      if (!result.includes(d)) result.push(d);
-    });
-    return result.length > 0 ? result : ["Geral"];
-  }, [activeWorkspace, cards]);
-
-  const AVAILABLE_TEAMS = useMemo(() => {
-    const configured = activeWorkspace?.teams || [];
-    const discovered = Array.from(new Set(cards.map((c) => c.team))).filter(Boolean);
-    const combined = Array.from(new Set([...configured, ...discovered]));
-    const result = configured.filter((t) => combined.includes(t));
-    discovered.forEach((d) => {
-      if (!result.includes(d)) result.push(d);
-    });
-    return result.length > 0 ? result : ["Equipe Geral"];
-  }, [activeWorkspace, cards]);
-
-  const displayedSectors = useMemo(() => {
-    if (equipmentFilter === "Todos") return AVAILABLE_SECTORS;
-    return AVAILABLE_SECTORS.filter((s) => s === equipmentFilter);
-  }, [AVAILABLE_SECTORS, equipmentFilter]);
-
-  // Reset filters when switching workspaces
-  useEffect(() => {
-    const currentFilters = {
-      searchQuery,
-      statusFilter,
-      teamFilter,
-      equipmentFilter,
-    };
-    if (
-      currentFilters.searchQuery !== "" ||
-      currentFilters.statusFilter !== "Todos" ||
-      currentFilters.teamFilter !== "Todos" ||
-      currentFilters.equipmentFilter !== "Todos"
-    ) {
-      resetFilters();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeWorkspaceId, resetFilters]);
-
-  useEffect(() => {
-    const initial: Record<string, boolean> = {};
-    AVAILABLE_TEAMS.forEach((t) => {
-      initial[t] = true;
-    });
-
-    // Update expanded teams only when AVAILABLE_TEAMS changes
-    setExpandedTeams((prev) => {
-      const hasChanged = AVAILABLE_TEAMS.some((t) => prev[t] === undefined);
-      if (!hasChanged) return prev;
-      return { ...initial, ...prev };
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [AVAILABLE_TEAMS.join(","), activeWorkspaceId]);
-
-  // --- Subscriptions ---
-  useEffect(() => {
-    const unsubCards = subscribeToCards(activeWorkspaceId, (data) => {
-      // Sort locally by order field
-      const sortedData = [...data].sort(
-        (a, b) => (a.order || 0) - (b.order || 0),
-      );
-      setCards(sortedData);
-    });
-    const unsubMsg = subscribeToMessages(
-      activeWorkspaceId,
-      selectedMonth,
-      (data) => {
-        // Sort by createdAt desc in memory because we removed Firestore orderBy to avoid index issues
-        const sorted = [...data].sort((a, b) => b.createdAt - a.createdAt);
-        setMessages(sorted);
-      },
-    );
-    const unsubMonthly = subscribeToMonthlyData((data) => setMonthlyData(data));
-
-    return () => {
-      unsubCards();
-      unsubMsg();
-      unsubMonthly();
-    };
-  }, [selectedMonth, activeWorkspaceId]);
-
   // Merge global card data with monthly overrides and versioning
   const mergedCards = useMemo(() => {
     const allMonths = Object.keys(monthlyData).sort();
@@ -264,6 +175,95 @@ export default function Board() {
         } as Card;
       });
   }, [cards, monthlyData, selectedMonth, activeWorkspace?.type]);
+
+  const AVAILABLE_SECTORS = useMemo(() => {
+    if (activeWorkspace?.type === "list") return [];
+    const configured = activeWorkspace?.sectors || [];
+    const discovered = Array.from(new Set(mergedCards.map((c) => c.equipment))).filter(Boolean);
+    const combined = Array.from(new Set([...configured, ...discovered]));
+    const result = configured.filter((s) => combined.includes(s));
+    discovered.forEach((d) => {
+      if (!result.includes(d)) result.push(d);
+    });
+    return result.length > 0 ? result : ["Geral"];
+  }, [activeWorkspace, mergedCards]);
+
+  const AVAILABLE_TEAMS = useMemo(() => {
+    const configured = activeWorkspace?.teams || [];
+    const discovered = Array.from(new Set(mergedCards.map((c) => c.team))).filter(Boolean);
+    const combined = Array.from(new Set([...configured, ...discovered]));
+    const result = configured.filter((t) => combined.includes(t));
+    discovered.forEach((d) => {
+      if (!result.includes(d)) result.push(d);
+    });
+    return result.length > 0 ? result : ["Equipe Geral"];
+  }, [activeWorkspace, mergedCards]);
+
+  const displayedSectors = useMemo(() => {
+    if (equipmentFilter === "Todos") return AVAILABLE_SECTORS;
+    return AVAILABLE_SECTORS.filter((s) => s === equipmentFilter);
+  }, [AVAILABLE_SECTORS, equipmentFilter]);
+
+  // Reset filters when switching workspaces
+  useEffect(() => {
+    const currentFilters = {
+      searchQuery,
+      statusFilter,
+      teamFilter,
+      equipmentFilter,
+    };
+    if (
+      currentFilters.searchQuery !== "" ||
+      currentFilters.statusFilter !== "Todos" ||
+      currentFilters.teamFilter !== "Todos" ||
+      currentFilters.equipmentFilter !== "Todos"
+    ) {
+      resetFilters();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWorkspaceId, resetFilters]);
+
+  useEffect(() => {
+    const initial: Record<string, boolean> = {};
+    AVAILABLE_TEAMS.forEach((t) => {
+      initial[t] = true;
+    });
+
+    // Update expanded teams only when AVAILABLE_TEAMS changes
+    setExpandedTeams((prev) => {
+      const hasChanged = AVAILABLE_TEAMS.some((t) => prev[t] === undefined);
+      if (!hasChanged) return prev;
+      return { ...initial, ...prev };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [AVAILABLE_TEAMS.join(","), activeWorkspaceId]);
+
+  // --- Subscriptions ---
+  useEffect(() => {
+    const unsubCards = subscribeToCards(activeWorkspaceId, (data) => {
+      // Sort locally by order field
+      const sortedData = [...data].sort(
+        (a, b) => (a.order || 0) - (b.order || 0),
+      );
+      setCards(sortedData);
+    });
+    const unsubMsg = subscribeToMessages(
+      activeWorkspaceId,
+      selectedMonth,
+      (data) => {
+        // Sort by createdAt desc in memory because we removed Firestore orderBy to avoid index issues
+        const sorted = [...data].sort((a, b) => b.createdAt - a.createdAt);
+        setMessages(sorted);
+      },
+    );
+    const unsubMonthly = subscribeToMonthlyData((data) => setMonthlyData(data));
+
+    return () => {
+      unsubCards();
+      unsubMsg();
+      unsubMonthly();
+    };
+  }, [selectedMonth, activeWorkspaceId]);
 
   // Filtering logic
   const filteredCards = useMemo(() => {

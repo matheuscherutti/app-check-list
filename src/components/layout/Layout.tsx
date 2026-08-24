@@ -35,9 +35,9 @@ export default function Layout() {
 
                 const initial: Workspace[] = [
                     { id: 'escalas', name: 'Check List - Escalas', type: 'checklist', isProtected: true, order: 0, sectors: defaultSectors, teams: defaultTeams },
-                    { id: 'payroll', name: 'Check List Payroll', type: 'checklist', order: 1, sectors: defaultSectors, teams: defaultTeams },
-                    { id: 'diarias', name: 'Check List Diárias', type: 'checklist', order: 2, sectors: defaultSectors, teams: defaultTeams },
-                    { id: 'treinamento', name: 'Check List Treinamento', type: 'checklist', order: 3, sectors: defaultSectors, teams: defaultTeams }
+                    { id: 'payroll', name: 'Check List Payroll', type: 'checklist', order: 1, sectors: [], teams: [] },
+                    { id: 'diarias', name: 'Check List Diárias', type: 'checklist', order: 2, sectors: [], teams: [] },
+                    { id: 'treinamento', name: 'Check List Treinamento', type: 'checklist', order: 3, sectors: [], teams: [] }
                 ];
 
                 initial.forEach(ws => upsertWorkspace(ws));

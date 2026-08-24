@@ -107,22 +107,26 @@ export default function Board() {
   );
 
   const AVAILABLE_SECTORS = useMemo(() => {
-    if (activeWorkspace?.type === 'list') return [];
-    if (activeWorkspace?.sectors && activeWorkspace.sectors.length > 0)
-      return activeWorkspace.sectors;
-    const discovered = Array.from(new Set(cards.map((c) => c.equipment)))
-      .filter(Boolean)
-      .sort();
-    return discovered.length > 0 ? discovered : ["Geral"];
+    if (activeWorkspace?.type === "list") return [];
+    const configured = activeWorkspace?.sectors || [];
+    const discovered = Array.from(new Set(cards.map((c) => c.equipment))).filter(Boolean);
+    const combined = Array.from(new Set([...configured, ...discovered]));
+    const result = configured.filter((s) => combined.includes(s));
+    discovered.forEach((d) => {
+      if (!result.includes(d)) result.push(d);
+    });
+    return result.length > 0 ? result : ["Geral"];
   }, [activeWorkspace, cards]);
 
   const AVAILABLE_TEAMS = useMemo(() => {
-    if (activeWorkspace?.teams && activeWorkspace.teams.length > 0)
-      return activeWorkspace.teams;
-    const discovered = Array.from(new Set(cards.map((c) => c.team)))
-      .filter(Boolean)
-      .sort();
-    return discovered.length > 0 ? discovered : ["Equipe Geral"];
+    const configured = activeWorkspace?.teams || [];
+    const discovered = Array.from(new Set(cards.map((c) => c.team))).filter(Boolean);
+    const combined = Array.from(new Set([...configured, ...discovered]));
+    const result = configured.filter((t) => combined.includes(t));
+    discovered.forEach((d) => {
+      if (!result.includes(d)) result.push(d);
+    });
+    return result.length > 0 ? result : ["Equipe Geral"];
   }, [activeWorkspace, cards]);
 
   const displayedSectors = useMemo(() => {
